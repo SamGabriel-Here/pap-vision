@@ -32,11 +32,18 @@ class Record:
 
 
 def infer_group(filename, pattern=DEFAULT_PATIENT_PATTERN):
-    """Extract a patient/slide identifier from a filename, or None."""
+    """Extract a patient/slide identifier from a filename, or None.
+
+    The identifier is lowercased. Real datasets are inconsistent about case —
+    Mendeley LBC ships `scc_1` and `SCC_3` in the same folder — and treating
+    those as different slides would split one slide across train and test,
+    which is precisely the leak this module exists to prevent.
+    """
     match = re.search(pattern, filename)
     if match is None:
         return None
-    return match.group(1) if match.groups() else match.group(0)
+    captured = match.group(1) if match.groups() else match.group(0)
+    return captured.strip().rstrip("_").lower()
 
 
 def build_records(files, pattern=DEFAULT_PATIENT_PATTERN, min_match_ratio=0.95):

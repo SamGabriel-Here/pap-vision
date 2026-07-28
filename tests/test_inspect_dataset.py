@@ -79,6 +79,39 @@ def test_a_pattern_that_collapses_everything_into_one_group_is_rejected():
     assert all(s["groups"] > 1 for s in usable)
 
 
+def test_real_mendeley_lbc_filenames_are_grouped_by_slide():
+    """Filenames taken verbatim from the published dataset listing."""
+    names = [
+        "NL_10_ (10).jpg", "NL_10_ (1).jpg", "NL_10_ (9).jpg",
+        "HSIL_2 (10).jpg", "HSIL_2 (1).jpg",
+        "scc_1 (10).jpg", "scc_1 (21).jpg",
+        "SCC_3 (1).jpg", "SCC_3 (11).jpg",
+        "LSIL_4 (37).jpg", "LSIL_4 (1).jpg",
+    ]
+    usable, _ = rank_patterns(names)
+
+    assert usable, "the published naming scheme must be recognised"
+    best = usable[0]
+    assert best["groups"] == 5, "expected slides nl_10, hsil_2, scc_1, scc_3, lsil_4"
+    assert best["match_ratio"] == 1.0
+
+
+def test_slide_ids_differing_only_in_case_are_one_group():
+    """The dataset ships both `scc_1` and `SCC_3`; case must not fragment a slide."""
+    names = ["scc_1 (1).jpg", "SCC_1 (2).jpg", "Scc_1 (3).jpg"]
+    stats = evaluate_pattern(names, r"^(.+?)\s*\(\d+\)\.jpe?g$")
+
+    assert stats["groups"] == 1
+
+
+def test_trailing_underscore_does_not_fragment_a_slide():
+    """NILM uses `NL_10_` while other classes use `HSIL_10`."""
+    stats = evaluate_pattern(
+        ["NL_7_ (1).jpg", "NL_7 (2).jpg"], r"^(.+?)\s*\(\d+\)\.jpe?g$"
+    )
+    assert stats["groups"] == 1
+
+
 def test_hyphen_separated_names_are_grouped():
     names = ["case-12-a.jpg", "case-12-b.jpg", "case-13-a.jpg", "case-13-b.jpg"]
     usable, _ = rank_patterns(names)

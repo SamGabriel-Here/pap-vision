@@ -1,0 +1,67 @@
+{
+  "split_grouped_by": "image",
+  "leakage_warning": "Split was by image, not by patient. Images from the same patient appear in both train and test, so every metric here is inflated and should be read as an optimistic upper bound, not a result.",
+  "balanced_accuracy": 0.9465,
+  "macro_f1": 0.95,
+  "accuracy": 0.9751,
+  "per_class": {
+    "HSIL": {
+      "precision": 0.9268,
+      "recall": 0.9268,
+      "f1": 0.9268,
+      "support": 41
+    },
+    "LSIL": {
+      "precision": 1.0,
+      "recall": 0.9643,
+      "f1": 0.9818,
+      "support": 28
+    },
+    "NILM": {
+      "precision": 0.9935,
+      "recall": 1.0,
+      "f1": 0.9967,
+      "support": 153
+    },
+    "SCC": {
+      "precision": 0.8947,
+      "recall": 0.8947,
+      "f1": 0.8947,
+      "support": 19
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "HSIL",
+      "LSIL",
+      "NILM",
+      "SCC"
+    ],
+    "rows_true_cols_pred": [
+      [
+        38,
+        0,
+        1,
+        2
+      ],
+      [
+        1,
+        27,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        153,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        17
+      ]
+    ]
+  }
+}

@@ -27,6 +27,10 @@ MIN_USABLE_GROUPS = 2
 
 # Ordered most-specific first; the first pattern that groups well enough wins.
 CANDIDATE_PATTERNS = [
+    # Mendeley LBC ships "NL_10_ (5).jpg" / "SCC_3 (2).jpg" — the slide id is
+    # everything before the parenthesised image number.
+    (r"^(.+?)\s*\(\d+\)\.jpe?g$", "prefix before a parenthesised image number"),
+    (r"^(.+?)__\d+\.[^.]+$", "slide__index convention"),
     (r"(?i)(?:patient|case|subject)[-_ ]?(\d+)", "explicit patient/case number"),
     (r"(?i)(?:slide|sl)[-_ ]?(\d+)", "explicit slide number"),
     (r"^(\d+)[-_]", "leading digits before a separator"),
@@ -43,7 +47,10 @@ def evaluate_pattern(filenames, pattern):
     for name in filenames:
         match = re.search(pattern, name)
         if match:
-            groups.append(match.group(1) if match.groups() else match.group(0))
+            captured = match.group(1) if match.groups() else match.group(0)
+            # Lowercased for the same reason splitting.infer_group does it:
+            # `scc_1` and `SCC_1` are one slide, not two.
+            groups.append(captured.strip().rstrip("_").lower())
 
     counts = Counter(groups)
     matched = len(groups)

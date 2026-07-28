@@ -78,49 +78,56 @@ Importing `app.py` loads the checkpoint at module scope, so the tests need
 keep it that way, or the suite starts asserting on model behaviour it cannot
 guarantee.
 
-## The checkpoint is orphaned — this is settled, don't re-litigate it
+## The model does not work, and that is the deliverable
 
-The training script and dataset behind `cervical_model.pth` **no longer exist**
-(confirmed by the author, 28 July 2026). What follows, and should not be argued
-around in later sessions:
+Retrained 29 July 2026 on Mendeley LBC with a slide-grouped split.
+**SCC recall is 0.00** — zero of 15 held-out carcinoma images identified, all
+classified as HSIL. Overall accuracy is 0.915.
 
-- The current checkpoint can never be audited. Do not write a model card for it,
-  do not infer its dataset, do not report any metric about it.
-- `CLASS_NAMES` cannot be verified against it. No artifact remains to check the
-  order against, so the mislabelling risk is permanent while these weights ship.
-- The only route to a defensible model is a full retrain from a documented
-  dataset. Characterising or repairing the existing weights is not an option.
+This is not a bug to be quietly improved away before anyone notices. The
+repository's value is the honest measurement and the leaky-split comparison
+beside it (macro-F1 0.693 grouped vs 0.950 by-image; SCC recall 0.00 vs 0.89).
+If a later session improves the model, the old numbers and the comparison stay
+in `MODEL_CARD.md` as history — don't delete the evidence that the naive number
+was wrong.
 
-## Open questions that gate the roadmap
+Do not write anything that describes this model as working, promising, or
+"achieving 92% accuracy". The accuracy figure without the per-class breakdown
+beside it is a lie of omission about a carcinoma classifier.
 
-Don't guess at these — ask.
+## Dataset facts that are settled
 
-- **Are patient identifiers actually recoverable from the dataset filenames?**
-  Unverified, and it is the one thing that could still block a clean split.
-  Answer it by downloading Mendeley LBC and listing a class folder. If the
-  answer is no, do not quietly fall back to a per-image split — see below.
-- What is the nearest job-application deadline? Per [[portfolio-strategy]] that
-  decides whether the retrain happens at all, or whether the time is better
-  spent on a backend-systems project.
+Read [DATASET.md](DATASET.md) before touching data code. In short:
 
-Dataset for the retrain is Mendeley LBC (Hussain et al.): 963 images, 460
-patients, CC BY 4.0, and the only common public set labelled with exactly these
-four Bethesda classes. The licence permits redistributing derived weights with
-attribution.
+- **61 slides, not 460 patients.** The paper's patient count is widely repeated
+  as though the images were independent samples. They are not — ~16 images per
+  slide.
+- **Only 4 LSIL and 4 SCC slides exist.** A grouped split leaves 1 test slide
+  for each. No methodology fixes this; only more data would.
+- **The commonly-cited class distribution is wrong.** Real counts are HSIL 163,
+  LSIL 113, NILM 612, SCC 74 (962 total). Published papers transpose HSIL and
+  LSIL. The HSIL folder also double-lists 10 filenames and NILM contains a
+  stray `Results.csv`.
+- Licence is CC BY 4.0 — derived weights are redistributable with attribution.
 
 ## Splitting rules, learned the hard way
 
 `splitting.py` and `tests/test_splitting.py` encode these. Don't loosen them.
 
-- **Group by patient, never by image.** ~2 images per patient means a per-image
-  split puts the same patient on both sides for most patients.
-- **Stratify by class as well.** Each patient carries a single diagnosis, so
+- **Group by slide, never by image.** ~16 images per slide means a per-image
+  split puts the same slide on both sides. That is worth +0.257 macro-F1 of
+  pure illusion, measured.
+- **Stratify by class as well.** Each slide carries a single diagnosis, so
   groups are class-pure and grouping alone wrecks the class balance. An early
   version of this pipeline put zero LSIL in the validation set and looked
   completely healthy while doing it.
-- **Fail loudly when patient ids can't be recovered.** `build_records` raises
+- **Normalise slide ids.** The dataset ships `scc_1` and `SCC_3`, and NILM uses
+  a trailing underscore (`NL_10_`). `infer_group` lowercases and strips trailing
+  underscores, or one slide fragments into two groups and leaks.
+- **Fail loudly when slide ids can't be recovered.** `build_records` raises
   rather than degrading to one-group-per-image. The `--group-by image` escape
   hatch is opt-in, prints a warning, and stamps `leakage_warning` into
   `metrics.json` so the numbers can't later be quoted as clean.
 - **Select checkpoints on macro-F1, not accuracy.** NILM is 64% of the data, so
-  accuracy stays high while the model quietly stops predicting SCC.
+  accuracy stays high while the model quietly stops predicting SCC. Note this
+  did not save SCC — it is necessary, not sufficient.

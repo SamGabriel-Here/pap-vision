@@ -1,0 +1,67 @@
+{
+  "split_grouped_by": "patient",
+  "leakage_warning": null,
+  "balanced_accuracy": 0.724,
+  "macro_f1": 0.6928,
+  "accuracy": 0.9153,
+  "per_class": {
+    "HSIL": {
+      "precision": 0.6981,
+      "recall": 0.9024,
+      "f1": 0.7872,
+      "support": 41
+    },
+    "LSIL": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 27
+    },
+    "NILM": {
+      "precision": 0.9744,
+      "recall": 0.9935,
+      "f1": 0.9838,
+      "support": 153
+    },
+    "SCC": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 15
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "HSIL",
+      "LSIL",
+      "NILM",
+      "SCC"
+    ],
+    "rows_true_cols_pred": [
+      [
+        37,
+        0,
+        4,
+        0
+      ],
+      [
+        0,
+        27,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        152,
+        0
+      ],
+      [
+        15,
+        0,
+        0,
+        0
+      ]
+    ]
+  }
+}
