@@ -1,27 +1,106 @@
-<!-- Replace your entire <form> block with this -->
-<input type="file" id="fileInput" accept="image/*">
-<button onclick="analyzeImage()">Analyze Image</button>
-
-<script>
-const BACKEND = "http://13.232.73.18:8080"; // paste your Render URL here
-
-async function analyzeImage() {
-  const file = document.getElementById("fileInput").files[0];
-  if (!file) return alert("Please select an image");
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  document.querySelector(".result").innerHTML = "Analyzing...";
-
-  const res = await fetch(`${BACKEND}/predict`, { method: "POST", body: formData });
-  const data = await res.json();
-
-  if (data.error) {
-    document.querySelector(".error").innerHTML = data.error;
-  } else {
-    document.querySelector(".result").innerHTML = `Prediction: <b>${data.prediction}</b>`;
-    document.querySelector(".confidence").innerHTML = `Confidence: ${data.confidence}%`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>PapVision — cervical cytology classifier (research use only)</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
   }
-}
-</script>
+  h1 { margin-bottom: 0.25rem; }
+  .subtitle { margin-top: 0; opacity: 0.75; }
+  .disclaimer {
+    border: 2px solid #b3261e;
+    border-left-width: 6px;
+    border-radius: 6px;
+    background: rgba(179, 38, 30, 0.08);
+    padding: 0.85rem 1rem;
+    margin: 1.5rem 0;
+  }
+  .disclaimer p { margin: 0.4rem 0 0; }
+  .disclaimer p:first-child { margin-top: 0; }
+  form { margin: 1.5rem 0; }
+  button { font: inherit; padding: 0.5rem 1.1rem; cursor: pointer; }
+  .error {
+    border-left: 6px solid #8a6d00;
+    background: rgba(138, 109, 0, 0.1);
+    padding: 0.85rem 1rem;
+    border-radius: 6px;
+  }
+  .result { margin-top: 2rem; }
+  .verdict { font-size: 1.6rem; font-weight: 700; margin: 0.25rem 0; }
+  img.preview { max-width: 100%; border-radius: 6px; margin-top: 1rem; }
+  table { border-collapse: collapse; margin-top: 1rem; }
+  th, td { text-align: left; padding: 0.35rem 1.25rem 0.35rem 0; }
+  th { border-bottom: 1px solid currentColor; }
+  td.score { text-align: right; font-variant-numeric: tabular-nums; }
+  footer { margin-top: 3rem; font-size: 0.9rem; opacity: 0.75; }
+</style>
+</head>
+<body>
+
+<h1>PapVision</h1>
+<p class="subtitle">Cervical cytology field classifier — MobileNetV3-Small, four Bethesda classes.</p>
+
+<div class="disclaimer">
+  <p><strong>Research and educational use only. Not a medical device. Not for diagnostic use.</strong></p>
+  <p>
+    This model has no published evaluation metrics, is not calibrated, and has never been
+    validated on clinical slides. It is not a substitute for examination by a qualified
+    cytopathologist. Do not use any output here to make, support, or influence a clinical
+    decision. If you have a health concern, talk to a doctor.
+  </p>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  <input type="file" name="file" accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff" required>
+  <button type="submit">Analyze image</button>
+</form>
+
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% endif %}
+
+{% if prediction %}
+  <div class="result">
+    <p>Predicted class</p>
+    <p class="verdict">{{ prediction }}</p>
+    <p>Top softmax score: {{ confidence }}% — this is a normalised logit, not a probability that the answer is correct.</p>
+
+    {% if probabilities %}
+      <table>
+        <thead><tr><th>Class</th><th class="score">Score</th></tr></thead>
+        <tbody>
+          {% for name, score in probabilities.items() %}
+            <tr><td>{{ name }}</td><td class="score">{{ score }}%</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    <div class="disclaimer">
+      <p><strong>This is not a diagnosis.</strong> Research and educational use only. Not a medical device.</p>
+    </div>
+  </div>
+{% endif %}
+
+{% if img_src %}
+  <img class="preview" src="{{ img_src }}" alt="Downscaled preview of the uploaded image">
+{% endif %}
+
+<footer>
+  <p>
+    Uploaded images are held in memory for the lifetime of the request and never written to disk.
+    Any preview shown is a downscaled copy embedded directly in this page.
+  </p>
+</footer>
+
+</body>
+</html>

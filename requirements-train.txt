@@ -1,0 +1,6 @@
+# Training-only dependencies. Not needed to run the web service.
+-r requirements.txt
+
+scikit-learn==1.9.0
+matplotlib==3.11.1
+numpy==2.4.4
