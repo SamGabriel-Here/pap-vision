@@ -48,10 +48,11 @@ IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 
 
 class CytologyDataset(Dataset):
-    def __init__(self, records, root, transform):
+    def __init__(self, records, root, transform, classes=CLASS_NAMES):
         self.records = records
         self.root = pathlib.Path(root)
         self.transform = transform
+        self.classes = list(classes)
 
     def __len__(self):
         return len(self.records)
@@ -59,21 +60,21 @@ class CytologyDataset(Dataset):
     def __getitem__(self, index):
         record = self.records[index]
         image = Image.open(self.root / record.label / record.path).convert("RGB")
-        return self.transform(image), CLASS_NAMES.index(record.label)
+        return self.transform(image), self.classes.index(record.label)
 
 
-def discover(data_dir):
+def discover(data_dir, classes=CLASS_NAMES):
     """Collect (filename, label) pairs from one folder per class."""
     root = pathlib.Path(data_dir)
-    missing = [name for name in CLASS_NAMES if not (root / name).is_dir()]
+    missing = [name for name in classes if not (root / name).is_dir()]
     if missing:
         raise SystemExit(
             f"Missing class folders in {root}: {', '.join(missing)}. "
-            f"Expected one directory per class: {', '.join(CLASS_NAMES)}"
+            f"Expected one directory per class: {', '.join(classes)}"
         )
 
     files = []
-    for label in CLASS_NAMES:
+    for label in classes:
         for path in sorted((root / label).iterdir()):
             if path.suffix.lower() in IMAGE_SUFFIXES:
                 files.append((path.name, label))
@@ -93,20 +94,20 @@ def pick_device(requested):
     return torch.device("cpu")
 
 
-def class_weights(records, device):
+def class_weights(records, device, classes=CLASS_NAMES):
     """Inverse-frequency weights. NILM is ~64% of this dataset, so a model that
     always answers NILM scores 64% accuracy while being clinically useless."""
     counts = torch.tensor(
-        [sum(1 for r in records if r.label == name) for name in CLASS_NAMES],
+        [sum(1 for r in records if r.label == name) for name in classes],
         dtype=torch.float,
     )
-    weights = counts.sum() / (len(CLASS_NAMES) * counts.clamp(min=1))
+    weights = counts.sum() / (len(classes) * counts.clamp(min=1))
     return weights.to(device)
 
 
-def build_model(device):
+def build_model(device, classes=CLASS_NAMES):
     model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-    model.classifier[3] = nn.Linear(model.classifier[3].in_features, len(CLASS_NAMES))
+    model.classifier[3] = nn.Linear(model.classifier[3].in_features, len(classes))
     return model.to(device)
 
 
@@ -146,17 +147,17 @@ def predict_all(model, loader, device):
     return np.array(true), np.array(pred)
 
 
-def write_report(true, pred, out_dir, grouped_by):
+def write_report(true, pred, out_dir, grouped_by, classes=CLASS_NAMES):
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    labels = list(range(len(CLASS_NAMES)))
+    labels = list(range(len(classes)))
     matrix = confusion_matrix(true, pred, labels=labels)
     report = classification_report(
-        true, pred, labels=labels, target_names=CLASS_NAMES,
+        true, pred, labels=labels, target_names=classes,
         output_dict=True, zero_division=0,
     )
 
-    display = ConfusionMatrixDisplay(matrix, display_labels=CLASS_NAMES)
+    display = ConfusionMatrixDisplay(matrix, display_labels=classes)
     display.plot(cmap="Blues", colorbar=False)
     display.figure_.suptitle(f"PapVision — held-out test set (split by {grouped_by})")
     display.figure_.savefig(out_dir / "confusion_matrix.png", dpi=150, bbox_inches="tight")
@@ -178,20 +179,20 @@ def write_report(true, pred, out_dir, grouped_by):
                 "f1": round(report[name]["f1-score"], 4),
                 "support": int(report[name]["support"]),
             }
-            for name in CLASS_NAMES
+            for name in classes
         },
-        "confusion_matrix": {"labels": CLASS_NAMES, "rows_true_cols_pred": matrix.tolist()},
+        "confusion_matrix": {"labels": classes, "rows_true_cols_pred": matrix.tolist()},
     }
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
 
     print("\nHeld-out test set")
     print(classification_report(
-        true, pred, labels=labels, target_names=CLASS_NAMES, zero_division=0,
+        true, pred, labels=labels, target_names=classes, zero_division=0,
     ))
     print(f"balanced accuracy {metrics['balanced_accuracy']}  "
           f"macro-F1 {metrics['macro_f1']}")
 
-    for name in ("HSIL", "SCC"):
+    for name in [n for n in ("HSIL", "SCC", "ABNORMAL") if n in classes]:
         stats = metrics["per_class"][name]
         print(f"  {name} recall {stats['recall']} on {stats['support']} test images "
               f"— a missed {name} is the expensive error here")
@@ -235,12 +236,13 @@ def fit(model, loaders, device, criterion, args):
     return model
 
 
-def build_loaders(splits, data_dir, batch_size):
+def build_loaders(splits, data_dir, batch_size, classes=CLASS_NAMES):
     return {
         name: DataLoader(
             CytologyDataset(
                 records, data_dir,
                 build_train_transform() if name == "train" else build_eval_transform(),
+                classes=classes,
             ),
             batch_size=batch_size,
             shuffle=(name == "train"),
@@ -277,6 +279,9 @@ def parse_args():
     parser.add_argument("--group-by", choices=["patient", "image"], default="patient",
                         help="'image' explicitly accepts a leaky split; the "
                              "resulting metrics are stamped as invalid")
+    parser.add_argument("--classes", default=",".join(CLASS_NAMES),
+                        help="Comma-separated class folders. Override to train a "
+                             "coarser task, e.g. 'NILM,ABNORMAL'")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print the split and exit without training")
     return parser.parse_args()
@@ -289,7 +294,8 @@ def main():
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    records = resolve_records(discover(args.data_dir), args)
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    records = resolve_records(discover(args.data_dir, classes), args)
 
     counts = group_counts(records)
     print(f"{len(records)} images across {len(counts)} groups "
@@ -307,16 +313,17 @@ def main():
     device = pick_device(args.device)
     print(f"training on {device}")
 
-    loaders = build_loaders(splits, args.data_dir, args.batch_size)
-    criterion = nn.CrossEntropyLoss(weight=class_weights(splits["train"], device))
-    model = fit(build_model(device), loaders, device, criterion, args)
+    loaders = build_loaders(splits, args.data_dir, args.batch_size, classes)
+    criterion = nn.CrossEntropyLoss(
+        weight=class_weights(splits["train"], device, classes))
+    model = fit(build_model(device, classes), loaders, device, criterion, args)
 
     true, pred = predict_all(model, loaders["test"], device)
-    write_report(true, pred, pathlib.Path(args.docs_dir), args.group_by)
+    write_report(true, pred, pathlib.Path(args.docs_dir), args.group_by, classes)
 
     torch.save(model.state_dict(), args.out)
     print(f"\nwrote {args.out} and {args.docs_dir}/")
-    print(f"class order baked into this checkpoint: {CLASS_NAMES}")
+    print(f"class order baked into this checkpoint: {classes}")
 
 
 if __name__ == "__main__":

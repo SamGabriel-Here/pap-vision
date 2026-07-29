@@ -78,6 +78,22 @@ Importing `app.py` loads the checkpoint at module scope, so the tests need
 keep it that way, or the suite starts asserting on model behaviour it cannot
 guarantee.
 
+## A six-number baseline beats this model — read this first
+
+`baseline.py` reduces each image to per-channel RGB mean and std (six numbers,
+no spatial information) and fits a logistic regression. Under the same
+slide-grouped 4-fold protocol it gets balanced accuracy **0.748 vs the CNN's
+0.689**, and SCC recall **0.435 vs 0.153**.
+
+A model that cannot see a cell should not beat one trained on cytology. Most of
+this dataset's separability is staining and illumination signature, not
+pathology. Do not describe the CNN as having learnt morphology — that is not
+established, and the baseline is evidence against it.
+
+The decisive experiment nobody has run yet: stain-normalise (Macenko/Reinhard),
+then re-run both. If the baseline collapses and the CNN holds, the CNN was
+learning morphology. If both collapse, the dataset cannot support the task.
+
 ## The model does not work, and that is the deliverable
 
 Retrained 29 July 2026 on Mendeley LBC with a slide-grouped split.

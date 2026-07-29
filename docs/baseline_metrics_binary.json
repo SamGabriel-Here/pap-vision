@@ -1,0 +1,58 @@
+{
+  "description": "Logistic regression on per-channel RGB mean and std only. No spatial information. Slide-grouped cross-validation.",
+  "classes": [
+    "NILM",
+    "ABNORMAL"
+  ],
+  "folds": 4,
+  "features": 6,
+  "summary": {
+    "accuracy": {
+      "mean": 0.8731,
+      "per_fold": [
+        0.8506224066390041,
+        0.921161825726141,
+        0.8630705394190872,
+        0.8577405857740585
+      ]
+    },
+    "balanced_accuracy": {
+      "mean": 0.8843,
+      "per_fold": [
+        0.8888888888888888,
+        0.9463276836158192,
+        0.8630272252786007,
+        0.8391257995735608
+      ]
+    },
+    "macro_f1": {
+      "mean": 0.865,
+      "per_fold": [
+        0.8447164948453608,
+        0.9070159407046401,
+        0.8606130711393869,
+        0.8478277153558053
+      ]
+    }
+  },
+  "per_class_recall": {
+    "NILM": {
+      "mean": 0.8816,
+      "per_fold": [
+        0.7777777777777778,
+        0.8926553672316384,
+        0.8633093525179856,
+        0.9925373134328358
+      ]
+    },
+    "ABNORMAL": {
+      "mean": 0.8871,
+      "per_fold": [
+        1.0,
+        1.0,
+        0.8627450980392157,
+        0.6857142857142857
+      ]
+    }
+  }
+}

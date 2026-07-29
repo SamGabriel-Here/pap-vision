@@ -112,6 +112,36 @@ final epoch, whereas the shipped single split selects a checkpoint on validation
 macro-F1. Some of the spread may be checkpoint selection rather than the split
 itself. The size of the variance is not in doubt; its attribution is.
 
+## The baseline this model does not beat
+
+Every image reduced to six numbers — per-channel RGB mean and standard deviation.
+No spatial information at all. Logistic regression on those six numbers, same
+slide-grouped 4-fold protocol:
+
+| Metric | Colour baseline (6 features) | This model |
+|---|---:|---:|
+| Accuracy | 0.779 | **0.849** |
+| Balanced accuracy | **0.748** | 0.689 |
+| Macro-F1 | 0.627 | **0.663** |
+| **SCC recall** | **0.435** | 0.153 |
+
+The baseline wins balanced accuracy and takes nearly three times the carcinoma
+recall. A model that cannot see a cell should not be competitive here. That it
+is means the separability in this dataset is largely **staining and illumination
+signature** — an artefact of when and how each slide was scanned — rather than
+cytological morphology.
+
+The honest reading is that this checkpoint has not demonstrably learnt cytology.
+It has learnt something, and part of that something is available from average
+colour alone.
+
+The decisive follow-up would be stain normalisation (Macenko or Reinhard) before
+re-running both. If the colour baseline collapses and the CNN holds, the CNN was
+learning morphology after all. If both collapse, the dataset cannot support the
+task. That experiment has not been run.
+
+Reproduce with `baseline.py`; results in [docs/baseline_metrics.json](docs/baseline_metrics.json).
+
 ## Known failure modes
 
 **SCC is barely predicted at all.** All 15 carcinoma images in the shipped test

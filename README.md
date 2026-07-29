@@ -7,11 +7,16 @@ honest account of why it doesn't work.
 model is reproducible from `train.py` against a cited dataset, with a published
 confusion matrix, per-class metrics, and 4-fold slide-grouped cross-validation.
 
-Those metrics say the model **essentially cannot detect squamous cell
-carcinoma** — mean recall 0.15 across folds, and 0.00 on the shipped split. They
-also say something about the dataset: fold-to-fold variance is so large that any
-single-split number from it, including the one this repo ships, should not be
-trusted on its own. Both of those results are the point of this repository.
+Three things came out of that, and none of them flatter the model:
+
+1. A logistic regression on **six colour numbers** matches the CNN, and beats it
+   on balanced accuracy and carcinoma recall.
+2. The model **essentially cannot detect squamous cell carcinoma** — mean recall
+   0.153 across folds, 0.00 on the shipped split.
+3. Fold-to-fold variance is so large that any single-split number from this
+   dataset, including the one this repo ships, is untrustworthy alone.
+
+Those results are the point of this repository.
 
 ---
 
@@ -31,6 +36,37 @@ This notice is also rendered at the top of the web UI and repeated beside every 
 ---
 
 ## The headline result
+
+**Six numbers beat the neural network.**
+
+Each image reduced to its per-channel RGB mean and standard deviation — no
+cells, no nuclei, no texture, no spatial information of any kind — then a
+logistic regression on those six numbers. Evaluated with the same slide-grouped
+4-fold cross-validation as the CNN:
+
+| Metric | 6-number colour baseline | Fine-tuned MobileNetV3 |
+|---|---:|---:|
+| Accuracy | 0.779 | **0.849** |
+| Balanced accuracy | **0.748** | 0.689 |
+| Macro-F1 | 0.627 | **0.663** |
+| **SCC recall** | **0.435** | 0.153 |
+
+The baseline wins on balanced accuracy and gets nearly **three times** the
+carcinoma recall. The CNN's only clear win is raw accuracy, which is dominated
+by NILM at 64% of the data.
+
+A model that cannot see a single cell should not be competitive with one trained
+to classify cytology. That it is means most of the separability in this dataset
+is **staining and illumination**, not pathology — a property of when and how each
+slide was scanned rather than of the patient it came from.
+
+Reproduce with `python baseline.py --data-dir data/`. This is the check that
+should be run before any deep model on a dataset like this is believed, and it
+takes about thirty seconds.
+
+---
+
+## The second result: how a leaky split lies
 
 The same architecture, the same hyperparameters, the same seed. The only
 difference is how the train/test split was drawn.
@@ -178,6 +214,7 @@ preprocessing.py      Transforms and class names shared by training and serving
 splitting.py          Leakage-safe, stratified, slide-grouped dataset splitting
 inspect_dataset.py    Pre-flight check: can slides be recovered from filenames?
 cross_validate.py     Slide-grouped k-fold, because one split is not a measurement
+baseline.py           Six-number colour baseline — what the CNN has to beat
 train.py              Fine-tuning pipeline; writes metrics and a confusion matrix
 cervical_model.pth    Trained weights (v0.2, reproducible from train.py)
 DATASET.md            Dataset audit, including corrections to its published description
@@ -188,8 +225,9 @@ docs/
   confusion_matrix.png            slide-grouped split — the honest one
   confusion_matrix_leaky_split.png  by-image split, for comparison
   metrics.json, metrics_leaky_split.json, cv_metrics.json
+  baseline_metrics.json, baseline_metrics_binary.json
 templates/index.html  Upload form, disclaimer, result display
-tests/                58 tests: upload handling, preprocessing, splitting, pattern ranking
+tests/                64 tests: upload handling, preprocessing, splitting, pattern ranking
 .github/workflows/ci.yml   Lint and test on every push
 ```
 
@@ -337,7 +375,9 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 
 ### v0.4 — Show the model's reasoning
 
+- [x] Trivial colour baseline, to establish what the CNN actually adds (answer: very little)
 - [ ] Grad-CAM overlay alongside every prediction — start with the SCC images it calls HSIL
+- [ ] Stain normalisation (Macenko or Reinhard), then re-run both baseline and CNN. If the colour baseline collapses and the CNN holds, the CNN was learning morphology after all. If both collapse, this dataset cannot support the task
 - [ ] Side-by-side input and heatmap in the web UI
 - [ ] README gallery of the model attending to nuclei vs staining artifacts
 
