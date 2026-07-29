@@ -6,9 +6,12 @@
 
 **Research and educational use only. Not a medical device. Not for diagnostic use.**
 
-This model has **zero recall on squamous cell carcinoma** against a held-out slide.
-It identified none of the 15 carcinoma images in the test set, classifying every
-one as HSIL. In a screening context that is the worst failure mode available.
+This model **essentially cannot detect squamous cell carcinoma**. On the shipped
+split it identified none of the 15 held-out carcinoma images, classifying every
+one as HSIL. Across 4-fold slide-grouped cross-validation its SCC recall
+averages **0.153** (range 0.00–0.55) — it misses roughly six carcinoma fields in
+seven. In a screening context that is the worst failure mode available.
+
 It is published because the failure is informative, not because the model works.
 
 ## Intended use
@@ -78,11 +81,44 @@ Balanced accuracy **0.724**, macro-F1 **0.693**.
 
 ![Confusion matrix](docs/confusion_matrix.png)
 
+## Cross-validation — every slide rotated through the test fold
+
+The metrics above rest on one held-out slide per rare class, so they were
+re-measured with 4-fold cross-validation grouped by slide.
+
+| Class | Mean recall | Min | Max | Per-fold |
+|---|---:|---:|---:|---|
+| HSIL | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
+| LSIL | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
+| NILM | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
+| **SCC** | **0.153** | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+
+Accuracy 0.849 (0.808–0.937) · balanced accuracy 0.689 (0.590–0.840) · macro-F1
+0.663 (0.581–0.834). Full detail in [docs/cv_metrics.json](docs/cv_metrics.json),
+reproducible with `cross_validate.py`.
+
+Two conclusions, and the second matters more:
+
+1. **SCC is not reliably zero.** One fold reached 0.55. The shipped split's 0.00
+   is the worst case, not the universal one. A mean of 0.153 is still unusable.
+2. **The variance is the real finding.** HSIL recall spans 0.39 to 1.00 purely on
+   which slides were held out. With 61 slides and only 4 in each rare class, a
+   single split measures the split as much as the model. Any single-split number
+   from this dataset — including the one this card leads with — should be read as
+   one draw from a wide distribution.
+
+*Protocol note:* cross-validation folds train on train/test only and use the
+final epoch, whereas the shipped single split selects a checkpoint on validation
+macro-F1. Some of the spread may be checkpoint selection rather than the split
+itself. The size of the variance is not in doubt; its attribution is.
+
 ## Known failure modes
 
-**SCC is never predicted.** All 15 carcinoma images were classified as HSIL. The
-model was trained on 2 SCC slides and did not generalise to a third. This is not
-a threshold artefact — SCC is not the argmax for any test image.
+**SCC is barely predicted at all.** All 15 carcinoma images in the shipped test
+split were classified as HSIL, and cross-validated recall averages 0.153. The
+model sees 2–3 SCC slides in training and does not generalise to an unseen one.
+This is not a threshold artefact — on the shipped split, SCC is not the argmax
+for any test image.
 
 **Four HSIL images were classified as NILM.** High-grade lesions called normal is
 the other severe error, and it happens at roughly 10%.
@@ -110,9 +146,9 @@ slide — so images from one slide land on both sides of the boundary:
 | **SCC recall** | **0.00** | **0.89** | **+0.89** |
 
 The leaky split reports a model that detects carcinoma nine times in ten. The
-grouped split shows it never detects carcinoma at all. Both numbers come from
-the same code, minutes apart. This is the single most important thing in this
-repository.
+grouped split shows it detecting none of them here, and 0.153 cross-validated.
+Both numbers come from the same code, minutes apart. This is the single most
+important thing in this repository.
 
 Reproduce with `--group-by image`; that flag stamps a leakage warning into the
 metrics file so the numbers cannot later be quoted as clean.

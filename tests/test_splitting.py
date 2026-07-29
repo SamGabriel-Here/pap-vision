@@ -17,6 +17,7 @@ from splitting import (
     describe,
     group_counts,
     infer_group,
+    kfold_by_group,
     split_by_group,
 )
 
@@ -177,6 +178,56 @@ def test_impossible_ratios_are_rejected():
     records = build_records(synthetic_files())
     with pytest.raises(ValueError, match="leave room for a training set"):
         split_by_group(records, test_size=0.8, val_size=0.3)
+
+
+# --- cross-validation folds -----------------------------------------------
+
+def test_kfold_places_every_record_exactly_once():
+    records = build_records(synthetic_files())
+    bins = kfold_by_group(records, folds=4)
+
+    placed = [r.path for bin_ in bins for r in bin_]
+    assert len(placed) == len(records)
+    assert len(set(placed)) == len(records)
+
+
+def test_kfold_never_splits_a_group_across_folds():
+    bins = kfold_by_group(build_records(synthetic_files()), folds=4)
+    seen = {}
+    for index, bin_ in enumerate(bins):
+        for group in {r.group for r in bin_}:
+            assert group not in seen, f"{group} in folds {seen.get(group)} and {index}"
+            seen[group] = index
+
+
+def test_kfold_puts_every_class_in_every_fold():
+    bins = kfold_by_group(build_records(synthetic_files()), folds=4)
+    for index, bin_ in enumerate(bins):
+        present = {r.label for r in bin_}
+        assert present == set(CLASS_SIZES), f"fold {index} missing {set(CLASS_SIZES) - present}"
+
+
+def test_kfold_rotates_a_four_slide_class_one_per_fold():
+    """The real constraint: SCC has four slides, so 4-fold gives each a turn."""
+    files = [(f"scc_{s}__{i:03d}.jpg", "SCC") for s in range(1, 5) for i in range(20)]
+    files += [(f"nl_{s}__{i:03d}.jpg", "NILM") for s in range(1, 21) for i in range(15)]
+    bins = kfold_by_group(build_records(files, pattern=r"^(.+?)__\d+\.[^.]+$"), folds=4)
+
+    for bin_ in bins:
+        scc_slides = {r.group for r in bin_ if r.label == "SCC"}
+        assert len(scc_slides) == 1
+
+
+def test_kfold_rejects_more_folds_than_groups():
+    files = [(f"{p:04d}__001.jpg", "NILM") for p in range(3)]
+    records = build_records(files, pattern=r"^(.+?)__\d+\.[^.]+$")
+    with pytest.raises(ValueError, match="cannot fill"):
+        kfold_by_group(records, folds=5)
+
+
+def test_kfold_rejects_a_single_fold():
+    with pytest.raises(ValueError, match="at least 2"):
+        kfold_by_group(build_records(synthetic_files()), folds=1)
 
 
 # --- reporting ------------------------------------------------------------

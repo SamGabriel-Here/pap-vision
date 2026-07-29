@@ -81,8 +81,13 @@ guarantee.
 ## The model does not work, and that is the deliverable
 
 Retrained 29 July 2026 on Mendeley LBC with a slide-grouped split.
-**SCC recall is 0.00** — zero of 15 held-out carcinoma images identified, all
-classified as HSIL. Overall accuracy is 0.915.
+**SCC recall is 0.00 on the shipped split and 0.153 cross-validated** (4-fold,
+grouped by slide; per-fold 0.00 · 0.00 · 0.07 · 0.55). Overall accuracy 0.915.
+
+The cross-validation also found enormous fold-to-fold variance — HSIL recall
+spans 0.39 to 1.00 purely on which slides are held out. **Never quote a
+single-split number from this dataset without that range beside it**, including
+the numbers this repo itself ships.
 
 This is not a bug to be quietly improved away before anyone notices. The
 repository's value is the honest measurement and the leaky-split comparison

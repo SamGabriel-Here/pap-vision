@@ -1,0 +1,201 @@
+{
+  "folds": 4,
+  "grouped_by": "slide",
+  "epochs": 25,
+  "seed": 42,
+  "per_fold": [
+    {
+      "accuracy": 0.8084,
+      "balanced_accuracy": 0.601,
+      "macro_f1": 0.5814,
+      "per_class": {
+        "HSIL": {
+          "recall": 0.8095,
+          "precision": 0.4595,
+          "support": 42
+        },
+        "LSIL": {
+          "recall": 0.5946,
+          "precision": 1.0,
+          "support": 37
+        },
+        "NILM": {
+          "recall": 1.0,
+          "precision": 0.9873,
+          "support": 155
+        },
+        "SCC": {
+          "recall": 0.0,
+          "precision": 0.0,
+          "support": 27
+        }
+      }
+    },
+    {
+      "accuracy": 0.814,
+      "balanced_accuracy": 0.5898,
+      "macro_f1": 0.5821,
+      "per_class": {
+        "HSIL": {
+          "recall": 0.3947,
+          "precision": 0.4688,
+          "support": 38
+        },
+        "LSIL": {
+          "recall": 0.9643,
+          "precision": 0.8438,
+          "support": 28
+        },
+        "NILM": {
+          "recall": 1.0,
+          "precision": 1.0,
+          "support": 155
+        },
+        "SCC": {
+          "recall": 0.0,
+          "precision": 0.0,
+          "support": 21
+        }
+      }
+    },
+    {
+      "accuracy": 0.8347,
+      "balanced_accuracy": 0.7255,
+      "macro_f1": 0.6539,
+      "per_class": {
+        "HSIL": {
+          "recall": 1.0,
+          "precision": 0.6087,
+          "support": 42
+        },
+        "LSIL": {
+          "recall": 1.0,
+          "precision": 0.7105,
+          "support": 27
+        },
+        "NILM": {
+          "recall": 0.8355,
+          "precision": 1.0,
+          "support": 152
+        },
+        "SCC": {
+          "recall": 0.0667,
+          "precision": 0.5,
+          "support": 15
+        }
+      }
+    },
+    {
+      "accuracy": 0.9372,
+      "balanced_accuracy": 0.8403,
+      "macro_f1": 0.8342,
+      "per_class": {
+        "HSIL": {
+          "recall": 0.8293,
+          "precision": 0.8718,
+          "support": 41
+        },
+        "LSIL": {
+          "recall": 1.0,
+          "precision": 1.0,
+          "support": 21
+        },
+        "NILM": {
+          "recall": 0.9867,
+          "precision": 0.9867,
+          "support": 150
+        },
+        "SCC": {
+          "recall": 0.5455,
+          "precision": 0.4615,
+          "support": 11
+        }
+      }
+    }
+  ],
+  "summary": {
+    "HSIL": {
+      "recall_mean": 0.7584,
+      "recall_min": 0.3947,
+      "recall_max": 1.0,
+      "per_fold_recall": [
+        0.8095,
+        0.3947,
+        1.0,
+        0.8293
+      ],
+      "test_images_per_fold": [
+        42,
+        38,
+        42,
+        41
+      ]
+    },
+    "LSIL": {
+      "recall_mean": 0.8897,
+      "recall_min": 0.5946,
+      "recall_max": 1.0,
+      "per_fold_recall": [
+        0.5946,
+        0.9643,
+        1.0,
+        1.0
+      ],
+      "test_images_per_fold": [
+        37,
+        28,
+        27,
+        21
+      ]
+    },
+    "NILM": {
+      "recall_mean": 0.9556,
+      "recall_min": 0.8355,
+      "recall_max": 1.0,
+      "per_fold_recall": [
+        1.0,
+        1.0,
+        0.8355,
+        0.9867
+      ],
+      "test_images_per_fold": [
+        155,
+        155,
+        152,
+        150
+      ]
+    },
+    "SCC": {
+      "recall_mean": 0.153,
+      "recall_min": 0.0,
+      "recall_max": 0.5455,
+      "per_fold_recall": [
+        0.0,
+        0.0,
+        0.0667,
+        0.5455
+      ],
+      "test_images_per_fold": [
+        27,
+        21,
+        15,
+        11
+      ]
+    },
+    "accuracy": {
+      "mean": 0.8486,
+      "min": 0.8084,
+      "max": 0.9372
+    },
+    "balanced_accuracy": {
+      "mean": 0.6892,
+      "min": 0.5898,
+      "max": 0.8403
+    },
+    "macro_f1": {
+      "mean": 0.6629,
+      "min": 0.5814,
+      "max": 0.8342
+    }
+  }
+}

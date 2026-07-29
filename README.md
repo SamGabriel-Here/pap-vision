@@ -3,10 +3,15 @@
 A cervical cytology image classifier served as a small Flask web app, and an
 honest account of why it doesn't work.
 
-**Status: v0.2 — retrained, evaluated, and documented.** The model is now
-reproducible from `train.py` against a cited dataset, with a published confusion
-matrix and per-class metrics. Those metrics say the model has **zero recall on
-squamous cell carcinoma**. That result is the point of this repository.
+**Status: v0.2 — retrained, evaluated, cross-validated, and documented.** The
+model is reproducible from `train.py` against a cited dataset, with a published
+confusion matrix, per-class metrics, and 4-fold slide-grouped cross-validation.
+
+Those metrics say the model **essentially cannot detect squamous cell
+carcinoma** — mean recall 0.15 across folds, and 0.00 on the shipped split. They
+also say something about the dataset: fold-to-fold variance is so large that any
+single-split number from it, including the one this repo ships, should not be
+trusted on its own. Both of those results are the point of this repository.
 
 ---
 
@@ -43,8 +48,9 @@ sides of the boundary, so the model only has to recognise a slide's staining and
 illumination signature rather than its pathology.
 
 Do that, and you get a model that appears to detect carcinoma nine times out of
-ten. Split by slide instead, and it detects carcinoma **zero** times out of
-fifteen. Both numbers came from the same code, minutes apart.
+ten. Split by slide instead, and on this split it detects carcinoma **zero**
+times out of fifteen — cross-validated across every slide, 0.15. Both numbers
+came from the same code, minutes apart.
 
 Published work on this dataset routinely reports accuracy in the high nineties.
 
@@ -75,6 +81,39 @@ confidently wrong.
 LSIL's perfect score is not good news either: all 27 LSIL test images come from
 a single slide, so the model may have learnt that slide rather than low-grade
 lesion morphology. Nothing in this dataset can distinguish those.
+
+### But one split is not enough to say that
+
+Every number above rests on a single held-out slide per rare class. To check
+whether they are real or an accident of which slide landed in test, every slide
+was rotated through the test fold — 4-fold, grouped by slide:
+
+| Class | Mean recall | Min | Max | Per-fold |
+|---|---:|---:|---:|---|
+| HSIL | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
+| LSIL | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
+| NILM | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
+| **SCC** | **0.153** | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+
+Accuracy 0.849 (0.808–0.937) · balanced accuracy 0.689 (0.590–0.840) · macro-F1
+0.663 (0.581–0.834).
+
+This changes two things. **SCC is not reliably 0.00** — one fold reached 0.55, so
+the shipped split's zero is the worst case rather than the universal one. Mean
+0.15 is still a model that misses roughly six carcinoma fields in seven.
+
+More importantly, **the spread is enormous**. HSIL recall ranges from 0.39 to
+1.00 depending only on which slides were held out. Macro-F1 moves by 0.25. With
+4 slides in the rare classes and 61 overall, a single split on this dataset
+measures the split as much as the model — which means published single-split
+results on it, including the one this repo ships, are not trustworthy on their
+own.
+
+*Protocol note:* the cross-validation trains on train/test folds only, so it
+uses the final epoch rather than selecting a checkpoint on validation macro-F1
+the way the shipped single split does. Some of the spread may be checkpoint
+selection rather than the split. The magnitude of the variance is not in doubt;
+its precise attribution is.
 
 Full detail in [MODEL_CARD.md](MODEL_CARD.md); dataset audit in [DATASET.md](DATASET.md).
 
@@ -138,6 +177,7 @@ app.py                Flask routes, model loading, upload validation, inference
 preprocessing.py      Transforms and class names shared by training and serving
 splitting.py          Leakage-safe, stratified, slide-grouped dataset splitting
 inspect_dataset.py    Pre-flight check: can slides be recovered from filenames?
+cross_validate.py     Slide-grouped k-fold, because one split is not a measurement
 train.py              Fine-tuning pipeline; writes metrics and a confusion matrix
 cervical_model.pth    Trained weights (v0.2, reproducible from train.py)
 DATASET.md            Dataset audit, including corrections to its published description
@@ -147,9 +187,9 @@ requirements-train.txt Training-only extras (scikit-learn, matplotlib, numpy)
 docs/
   confusion_matrix.png            slide-grouped split — the honest one
   confusion_matrix_leaky_split.png  by-image split, for comparison
-  metrics.json, metrics_leaky_split.json
+  metrics.json, metrics_leaky_split.json, cv_metrics.json
 templates/index.html  Upload form, disclaimer, result display
-tests/                52 tests: upload handling, preprocessing, splitting, pattern ranking
+tests/                58 tests: upload handling, preprocessing, splitting, pattern ranking
 .github/workflows/ci.yml   Lint and test on every push
 ```
 
@@ -282,6 +322,7 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 - [x] Publish a confusion matrix and per-class precision, recall, F1
 - [x] Report macro-F1 and balanced accuracy alongside raw accuracy
 - [x] Quantify what a leaky split would have claimed instead
+- [x] Cross-validate, grouped by slide, so the headline doesn't rest on one held-out slide
 - [x] `MODEL_CARD.md`
 
 ### v0.3 — Harden the service ✅
@@ -319,8 +360,8 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 
 ### v1.0 — Beyond a single field
 
-- [ ] **More SCC and LSIL slides from other sources** — the binding constraint
-- [ ] Grouped k-fold cross-validation instead of one split, given how few slides there are
+- [ ] **More SCC and LSIL slides from other sources** — the binding constraint on everything else
+- [ ] Collapse to the question this data can actually answer: NILM vs abnormal is 43 slides against 18, and it is the clinically meaningful screening call
 - [ ] Whole-slide input with tiling and slide-level aggregation
 - [ ] Compare against a stronger backbone and report the accuracy/latency tradeoff
 

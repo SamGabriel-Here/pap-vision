@@ -1,12 +1,18 @@
 """Leakage-safe dataset splitting.
 
-The Mendeley LBC set is 963 images drawn from 460 patients — roughly two images
-per patient. A random per-image split therefore puts both images from the same
-patient on opposite sides of the train/test boundary for most patients, and the
-model gets scored on slides it has already memorised. The resulting accuracy is
-inflated and meaningless, and nothing about the training run looks wrong.
+The Mendeley LBC set is 962 images drawn from just 61 slides — roughly sixteen
+images per slide, not the two-per-patient the published description implies
+(see DATASET.md). A random per-image split therefore puts images from the same
+slide on both sides of the train/test boundary almost every time, and the model
+only has to recognise a slide's staining and illumination signature rather than
+its pathology. The resulting accuracy is inflated and meaningless, and nothing
+about the training run looks wrong.
 
-So splitting happens by *group* (patient or slide), never by image, and the
+Measured on this dataset, that is worth +0.257 macro-F1 of pure illusion, and it
+turns a model that never detects carcinoma into one that appears to detect it
+nine times in ten.
+
+So splitting happens by *group* (slide or patient), never by image, and the
 result is asserted disjoint rather than assumed to be.
 """
 
@@ -18,6 +24,10 @@ from dataclasses import dataclass
 # at the dataset's naming scheme and is deliberately overridable, because
 # guessing wrong here is the single most expensive mistake in this pipeline.
 DEFAULT_PATIENT_PATTERN = r"^(\d+)"
+
+
+# Two is the smallest number of folds that can hold out anything at all.
+MIN_FOLDS = 2
 
 
 class GroupingError(Exception):
@@ -134,6 +144,45 @@ def split_by_group(records, test_size=0.2, val_size=0.1, seed=42):
 
     assert_no_group_leakage(splits)
     return splits
+
+
+def kfold_by_group(records, folds=4, seed=42):
+    """Partition records into k folds, grouped by slide and stratified by class.
+
+    A single train/test split is fragile when the rare classes have only four
+    slides between them: whichever slide lands in test decides the headline
+    number. Rotating every slide through the test fold turns "recall was 0.00"
+    into "recall was 0.00 in each of four folds", which is a claim that
+    survives the obvious follow-up question.
+    """
+    if folds < MIN_FOLDS:
+        raise ValueError(f"folds must be at least {MIN_FOLDS}")
+
+    by_group = defaultdict(list)
+    for record in records:
+        by_group[record.group].append(record)
+
+    if len(by_group) < folds:
+        raise ValueError(f"{len(by_group)} groups cannot fill {folds} folds")
+
+    strata = defaultdict(list)
+    for group, items in by_group.items():
+        label = Counter(record.label for record in items).most_common(1)[0][0]
+        strata[label].append((group, items))
+
+    bins = [[] for _ in range(folds)]
+    for label in sorted(strata):
+        # Largest groups first, so the big ones are placed while there is still
+        # room to balance around them.
+        ordered = sorted(strata[label], key=lambda kv: (-len(kv[1]), kv[0]))
+        placed = [0] * folds
+        for _group, items in ordered:
+            target = min(range(folds), key=lambda i: (placed[i], i))
+            bins[target].extend(items)
+            placed[target] += len(items)
+
+    assert_no_group_leakage({f"fold{i}": bin_ for i, bin_ in enumerate(bins)})
+    return bins
 
 
 def assert_no_group_leakage(splits):
