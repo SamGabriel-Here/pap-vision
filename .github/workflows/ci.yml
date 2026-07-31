@@ -19,9 +19,12 @@ jobs:
           cache: pip
 
       - name: Install dependencies
+        # requirements-train.txt includes requirements.txt and adds scikit-learn,
+        # which tests/test_baseline.py needs via baseline.py. Installing only the
+        # runtime requirements makes that suite fail at import.
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-train.txt
           pip install pytest ruff
 
       - name: Lint
