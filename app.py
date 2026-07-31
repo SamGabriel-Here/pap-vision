@@ -21,6 +21,28 @@ MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 PREVIEW_MAX_EDGE = 384
 CONFIDENCE_THRESHOLD = 0.90
 
+# CLASS_NAMES is alphabetical because that is the order baked into the
+# checkpoint and it must not change. For display, severity order reads better:
+# normal through to carcinoma, the way the Bethesda system is taught.
+SEVERITY_ORDER = ["NILM", "LSIL", "HSIL", "SCC"]
+
+CLASS_MEANINGS = {
+    "NILM": "Negative for intraepithelial lesion or malignancy",
+    "LSIL": "Low-grade squamous intraepithelial lesion",
+    "HSIL": "High-grade squamous intraepithelial lesion",
+    "SCC": "Squamous cell carcinoma",
+}
+
+# What the model's measured behaviour is for each class, shown in the UI so a
+# result is never presented without the evidence about how much to trust it.
+# Figures are from 4-fold slide-grouped cross-validation — see MODEL_CARD.md.
+CLASS_RELIABILITY = {
+    "NILM": ("0.96", "Most reliable class, and the easiest — 64% of the training data."),
+    "LSIL": ("0.89", "Looks strong, but every test image came from a single slide."),
+    "HSIL": ("0.76", "Swings between 0.39 and 1.00 depending on which slides are held out."),
+    "SCC": ("0.15", "Effectively broken. Usually returns HSIL instead, with high confidence."),
+}
+
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
@@ -109,6 +131,20 @@ def preview_data_uri(image):
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
 
     return f"data:image/png;base64,{encoded}"
+
+
+@app.context_processor
+def template_globals():
+    """Available to every render, so a result can never be shown without the
+    class meanings and measured reliability beside it."""
+    return {
+        "meanings": CLASS_MEANINGS,
+        "reliability": CLASS_RELIABILITY,
+        "class_names": SEVERITY_ORDER,
+        "threshold_percent": int(CONFIDENCE_THRESHOLD * 100),
+        "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
+        "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+    }
 
 
 @app.after_request

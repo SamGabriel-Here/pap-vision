@@ -193,3 +193,33 @@ def test_health_endpoint(client):
     payload = client.get("/health").get_json()
     assert payload["status"] == "ok"
     assert payload["classes"] == papvision.CLASS_NAMES
+
+
+# --- results reference ----------------------------------------------------
+
+def test_severity_order_is_display_only_and_never_the_checkpoint_order(client):
+    """CLASS_NAMES is baked into the weights and must stay alphabetical; the UI
+    lists classes normal-to-carcinoma. Confusing the two mislabels every output."""
+    assert papvision.CLASS_NAMES == sorted(papvision.CLASS_NAMES)
+    assert papvision.SEVERITY_ORDER == ["NILM", "LSIL", "HSIL", "SCC"]
+    assert sorted(papvision.SEVERITY_ORDER) == papvision.CLASS_NAMES
+
+
+def test_every_class_is_explained_with_its_measured_recall(client):
+    body = client.get("/").get_data(as_text=True)
+    for name in papvision.CLASS_NAMES:
+        assert papvision.CLASS_MEANINGS[name] in body
+        assert papvision.CLASS_RELIABILITY[name][0] in body
+
+
+def test_the_reference_lists_classes_in_severity_order(client):
+    body = client.get("/").get_data(as_text=True)
+    positions = [body.index(papvision.CLASS_MEANINGS[n]) for n in papvision.SEVERITY_ORDER]
+    assert positions == sorted(positions), "reference must read NILM -> SCC"
+
+
+def test_the_scc_entry_says_it_is_broken(client):
+    """The one result a user most needs warned about."""
+    body = client.get("/").get_data(as_text=True)
+    assert "0.15" in body
+    assert "Effectively broken" in body

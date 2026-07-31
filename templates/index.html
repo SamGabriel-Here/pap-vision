@@ -6,101 +6,423 @@
 <meta name="robots" content="noindex, nofollow">
 <title>PapVision — cervical cytology classifier (research use only)</title>
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #fbfbfd;
+    --line: #e4e7ec;
+    --ink: #14161a;
+    --muted: #5f6672;
+    --faint: #8b919c;
+    --accent: #2563eb;
+    --danger: #b3261e;
+    --danger-bg: #fdf3f2;
+    --danger-line: #e9b8b4;
+    --warn: #8a5a00;
+    --warn-bg: #fdf8ee;
+    --warn-line: #e6d3a8;
+    --nilm: #1a7f4b;
+    --lsil: #a67c00;
+    --hsil: #c2410c;
+    --scc:  #b3261e;
+    --shadow: 0 1px 2px rgba(16,18,22,.05), 0 8px 24px -12px rgba(16,18,22,.18);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0e11;
+      --surface: #16181d;
+      --surface-2: #1b1e24;
+      --line: #272a32;
+      --ink: #e9ebef;
+      --muted: #99a0ac;
+      --faint: #6f7683;
+      --accent: #6ea3ff;
+      --danger: #ff7b72;
+      --danger-bg: #24161a;
+      --danger-line: #59302f;
+      --warn: #e3b341;
+      --warn-bg: #221d12;
+      --warn-line: #4d3f1f;
+      --nilm: #4ade80;
+      --lsil: #e3b341;
+      --hsil: #fb923c;
+      --scc:  #ff7b72;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -16px rgba(0,0,0,.7);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
   body {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    line-height: 1.5;
-    max-width: 46rem;
-    margin: 0 auto;
-    padding: 2rem 1.25rem 4rem;
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(1000px 500px at 50% -12%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+      var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 3.5rem 1.25rem 5rem;
   }
-  h1 { margin-bottom: 0.25rem; }
-  .subtitle { margin-top: 0; opacity: 0.75; }
+
+  .wrap { max-width: 44rem; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  header { text-align: center; margin-bottom: 2rem; }
+  .mark {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .72rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--line); background: var(--surface);
+    padding: .3rem .7rem; border-radius: 999px; margin-bottom: 1rem;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--nilm); }
+  h1 {
+    margin: 0; font-size: clamp(2rem, 6vw, 2.6rem); letter-spacing: -.035em;
+    font-weight: 700; line-height: 1.1;
+  }
+  .tagline { margin: .5rem 0 0; color: var(--muted); font-size: 1.02rem; }
+
+  /* ---------- disclaimer ---------- */
   .disclaimer {
-    border: 2px solid #b3261e;
-    border-left-width: 6px;
-    border-radius: 6px;
-    background: rgba(179, 38, 30, 0.08);
-    padding: 0.85rem 1rem;
-    margin: 1.5rem 0;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-line);
+    border-left: 4px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    margin: 1.75rem 0;
   }
-  .disclaimer p { margin: 0.4rem 0 0; }
-  .disclaimer p:first-child { margin-top: 0; }
-  form { margin: 1.5rem 0; }
-  button { font: inherit; padding: 0.5rem 1.1rem; cursor: pointer; }
-  .error {
-    border-left: 6px solid #8a6d00;
-    background: rgba(138, 109, 0, 0.1);
-    padding: 0.85rem 1rem;
-    border-radius: 6px;
+  .disclaimer .head {
+    display: flex; align-items: center; gap: .5rem;
+    font-weight: 700; color: var(--danger); margin-bottom: .55rem;
+    font-size: .95rem; letter-spacing: -.01em;
   }
-  .result { margin-top: 2rem; }
-  .verdict { font-size: 1.6rem; font-weight: 700; margin: 0.25rem 0; }
-  img.preview { max-width: 100%; border-radius: 6px; margin-top: 1rem; }
-  table { border-collapse: collapse; margin-top: 1rem; }
-  th, td { text-align: left; padding: 0.35rem 1.25rem 0.35rem 0; }
-  th { border-bottom: 1px solid currentColor; }
-  td.score { text-align: right; font-variant-numeric: tabular-nums; }
-  footer { margin-top: 3rem; font-size: 0.9rem; opacity: 0.75; }
+  .disclaimer p { margin: 0; font-size: .9rem; color: var(--muted); }
+  .disclaimer p + p { margin-top: .6rem; }
+  .disclaimer strong { color: var(--ink); }
+
+  /* ---------- card + form ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+  }
+  .card + .card { margin-top: 1rem; }
+
+  .field-label {
+    display: block; font-size: .78rem; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .08em;
+    color: var(--faint); margin-bottom: .6rem;
+  }
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+
+  input[type=file] {
+    flex: 1 1 16rem; min-width: 0;
+    font: inherit; font-size: .9rem; color: var(--muted);
+    background: var(--surface-2);
+    border: 1px dashed var(--line);
+    border-radius: 10px; padding: .6rem .7rem;
+    cursor: pointer;
+  }
+  input[type=file]:hover { border-color: var(--accent); }
+  input[type=file]::file-selector-button {
+    font: inherit; font-size: .85rem; font-weight: 600;
+    margin-right: .8rem; padding: .45rem .9rem;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); color: var(--ink);
+    cursor: pointer;
+  }
+  input[type=file]::file-selector-button:hover { border-color: var(--accent); color: var(--accent); }
+
+  button {
+    font: inherit; font-weight: 650; font-size: .92rem;
+    padding: .68rem 1.4rem; border: 0; border-radius: 10px;
+    background: var(--accent); color: #fff; cursor: pointer;
+    letter-spacing: -.01em;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: translateY(1px); }
+
+  .hint { margin: .85rem 0 0; font-size: .82rem; color: var(--faint); }
+
+  /* ---------- messages ---------- */
+  .notice {
+    display: flex; gap: .7rem; align-items: flex-start;
+    background: var(--warn-bg); border: 1px solid var(--warn-line);
+    border-left: 4px solid var(--warn);
+    border-radius: 10px; padding: .9rem 1rem; margin-top: 1.15rem;
+    font-size: .9rem;
+  }
+  .notice b { color: var(--warn); }
+
+  /* ---------- result ---------- */
+  .verdict-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap; margin-bottom: 1.15rem;
+  }
+  .verdict-label {
+    font-size: .78rem; font-weight: 650; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--faint);
+  }
+  .verdict {
+    font-size: 2.4rem; font-weight: 750; letter-spacing: -.035em;
+    line-height: 1.05; margin: .2rem 0 0;
+  }
+  .verdict.c-NILM { color: var(--nilm); }
+  .verdict.c-LSIL { color: var(--lsil); }
+  .verdict.c-HSIL { color: var(--hsil); }
+  .verdict.c-SCC  { color: var(--scc); }
+  .verdict-meaning { font-size: .88rem; color: var(--muted); margin: .3rem 0 0; }
+
+  .scores { margin-top: .35rem; }
+  .score-row { display: grid; grid-template-columns: 3.4rem 1fr 3.6rem; gap: .75rem;
+               align-items: center; padding: .32rem 0; }
+  .score-name { font-size: .84rem; font-weight: 600; color: var(--muted); }
+  .score-row.top .score-name { color: var(--ink); }
+  .track { height: 7px; background: var(--surface-2); border: 1px solid var(--line);
+           border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 99px; }
+  .fill.c-NILM { background: var(--nilm); }
+  .fill.c-LSIL { background: var(--lsil); }
+  .fill.c-HSIL { background: var(--hsil); }
+  .fill.c-SCC  { background: var(--scc); }
+  .score-val { font-size: .82rem; text-align: right; color: var(--muted);
+               font-variant-numeric: tabular-nums;
+               font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .score-row.top .score-val { color: var(--ink); font-weight: 650; }
+
+  .caveat {
+    margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
+    font-size: .84rem; color: var(--muted);
+  }
+  .caveat strong { color: var(--danger); }
+
+  figure { margin: 1rem 0 0; }
+  figure img { display: block; width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+  figcaption { margin-top: .5rem; font-size: .78rem; color: var(--faint); text-align: center; }
+
+  /* ---------- outcomes reference ---------- */
+  .section-title { margin: 0 0 .35rem; font-size: 1.05rem; font-weight: 700; letter-spacing: -.015em; }
+  .section-intro { margin: 0 0 1.15rem; font-size: .87rem; color: var(--muted); }
+
+  .outcome {
+    display: grid; grid-template-columns: 7.2rem 1fr 4.2rem;
+    gap: .9rem; align-items: start;
+    padding: .85rem 0; border-top: 1px solid var(--line);
+  }
+  .chip {
+    display: inline-block; font-size: .74rem; font-weight: 700; letter-spacing: .02em;
+    padding: .24rem .55rem; border-radius: 6px; white-space: nowrap;
+    border: 1px solid currentColor;
+  }
+  .chip.c-NILM { color: var(--nilm); }
+  .chip.c-LSIL { color: var(--lsil); }
+  .chip.c-HSIL { color: var(--hsil); }
+  .chip.c-SCC  { color: var(--scc); }
+  .chip-mute { color: var(--faint); font-weight: 600; }
+
+  .outcome-name { margin: 0; font-size: .88rem; font-weight: 600; }
+  .outcome-note { margin: .25rem 0 0; font-size: .84rem; color: var(--muted); }
+  .outcome-note code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em;
+    background: var(--surface-2); border: 1px solid var(--line);
+    padding: .05em .35em; border-radius: 4px;
+  }
+
+  .outcome-metric { text-align: right; }
+  .metric-val {
+    display: block; font-size: 1.15rem; font-weight: 700;
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .metric-val.c-NILM { color: var(--nilm); }
+  .metric-val.c-LSIL { color: var(--lsil); }
+  .metric-val.c-HSIL { color: var(--hsil); }
+  .metric-val.c-SCC  { color: var(--scc); }
+  .metric-val.muted { color: var(--faint); font-size: .95rem; }
+  .metric-label {
+    display: block; font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--faint); margin-top: .1rem;
+  }
+
+  .outcome-footnote {
+    margin: 1.25rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--line);
+    font-size: .84rem; color: var(--muted);
+  }
+  .outcome-footnote strong { color: var(--ink); }
+
+  @media (max-width: 34rem) {
+    .outcome { grid-template-columns: 1fr auto; gap: .5rem .8rem; }
+    .outcome-key { grid-column: 1; }
+    .outcome-metric { grid-column: 2; grid-row: 1; }
+    .outcome-body { grid-column: 1 / -1; }
+    .score-row { grid-template-columns: 3rem 1fr 3.4rem; }
+  }
+
+  footer { margin-top: 2.5rem; text-align: center; font-size: .8rem; color: var(--faint); }
+  footer p { margin: .3rem 0; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<h1>PapVision</h1>
-<p class="subtitle">Cervical cytology field classifier — MobileNetV3-Small, four Bethesda classes.</p>
+<header>
+  <span class="mark"><span class="dot"></span> Research prototype</span>
+  <h1>PapVision</h1>
+  <p class="tagline">Cervical cytology field classifier — MobileNetV3-Small, four Bethesda classes.</p>
+</header>
 
 <div class="disclaimer">
-  <p><strong>Research and educational use only. Not a medical device. Not for diagnostic use.</strong></p>
+  <div class="head">⚠ Not a medical device · Not for diagnostic use</div>
   <p>
-    This model has no published evaluation metrics, is not calibrated, and has never been
-    validated on clinical slides. It is not a substitute for examination by a qualified
-    cytopathologist. Do not use any output here to make, support, or influence a clinical
-    decision. If you have a health concern, talk to a doctor.
+    This model has been evaluated, and <strong>it fails</strong>. Cross-validated recall on
+    squamous cell carcinoma is <strong>0.15</strong> — it misses roughly six carcinoma fields
+    in seven, usually calling them HSIL with high confidence. A logistic regression on six
+    colour numbers scores better. It is not calibrated and has never been validated on
+    clinical slides.
+  </p>
+  <p>
+    It is not a substitute for examination by a qualified cytopathologist. Do not use any
+    output here to make, support, or influence a clinical decision. If you have a health
+    concern, talk to a doctor.
   </p>
 </div>
 
-<form method="post" enctype="multipart/form-data">
-  <input type="file" name="file" accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff" required>
-  <button type="submit">Analyze image</button>
-</form>
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    <label class="field-label" for="file">Cytology field image</label>
+    <div class="row">
+      <input id="file" type="file" name="file"
+             accept=".png,.jpg,.jpeg,.bmp,.tif,.tiff" required>
+      <button type="submit">Analyze</button>
+    </div>
+  </form>
+  <p class="hint">PNG, JPEG, BMP or TIFF · up to 8 MB · held in memory, never written to disk</p>
 
-{% if error %}
-  <p class="error">{{ error }}</p>
-{% endif %}
+  {% if error %}
+    <div class="notice"><span>⚠</span><div><b>Not analyzed.</b> {{ error }}</div></div>
+  {% endif %}
+</div>
 
 {% if prediction %}
-  <div class="result">
-    <p>Predicted class</p>
-    <p class="verdict">{{ prediction }}</p>
-    <p>Top softmax score: {{ confidence }}% — this is a normalised logit, not a probability that the answer is correct.</p>
-
-    {% if probabilities %}
-      <table>
-        <thead><tr><th>Class</th><th class="score">Score</th></tr></thead>
-        <tbody>
-          {% for name, score in probabilities.items() %}
-            <tr><td>{{ name }}</td><td class="score">{{ score }}%</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% endif %}
-
-    <div class="disclaimer">
-      <p><strong>This is not a diagnosis.</strong> Research and educational use only. Not a medical device.</p>
+<div class="card">
+  <div class="verdict-head">
+    <div>
+      <div class="verdict-label">Predicted class</div>
+      <p class="verdict c-{{ prediction }}">{{ prediction }}</p>
+      <p class="verdict-meaning">{{ meanings[prediction] }}</p>
     </div>
   </div>
+
+  <div class="scores">
+    <div class="verdict-label" style="margin-bottom:.5rem">Softmax scores — not probabilities of being correct</div>
+    {% for name, score in probabilities|dictsort(by='value', reverse=true) %}
+      <div class="score-row {% if name == prediction %}top{% endif %}">
+        <span class="score-name">{{ name }}</span>
+        <span class="track"><span class="fill c-{{ name }}" style="width: {{ score }}%"></span></span>
+        <span class="score-val">{{ '%.2f'|format(score) }}%</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <p class="caveat">
+    <strong>This is not a diagnosis.</strong> Research and educational use only.
+    Not a medical device. Not for diagnostic use.
+    The number above is a normalised logit, not a probability that the answer is right —
+    this model returns high-confidence <em>wrong</em> answers on carcinoma.
+  </p>
+
+  {% if img_src %}
+    <figure>
+      <img src="{{ img_src }}" alt="Downscaled preview of the uploaded image">
+      <figcaption>Downscaled copy, embedded in this page</figcaption>
+    </figure>
+  {% endif %}
+</div>
+{% elif img_src %}
+<div class="card">
+  <figure style="margin:0">
+    <img src="{{ img_src }}" alt="Downscaled preview of the uploaded image">
+    <figcaption>Downscaled copy, embedded in this page</figcaption>
+  </figure>
+</div>
 {% endif %}
 
-{% if img_src %}
-  <img class="preview" src="{{ img_src }}" alt="Downscaled preview of the uploaded image">
-{% endif %}
+<div class="card">
+  <h2 class="section-title">What you can get back</h2>
+  <p class="section-intro">
+    Four classes, plus three ways the app declines to answer. Recall is from 4-fold
+    cross-validation grouped by slide — how often the model finds that class when it is
+    genuinely there.
+  </p>
+
+  {% for name in class_names %}
+    <div class="outcome">
+      <div class="outcome-key">
+        <span class="chip c-{{ name }}">{{ name }}</span>
+      </div>
+      <div class="outcome-body">
+        <p class="outcome-name">{{ meanings[name] }}</p>
+        <p class="outcome-note">{{ reliability[name][1] }}</p>
+      </div>
+      <div class="outcome-metric">
+        <span class="metric-val c-{{ name }}">{{ reliability[name][0] }}</span>
+        <span class="metric-label">recall</span>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="outcome">
+    <div class="outcome-key"><span class="chip chip-mute">Low confidence</span></div>
+    <div class="outcome-body">
+      <p class="outcome-name">No class is named</p>
+      <p class="outcome-note">
+        Returned when the top score falls below {{ threshold_percent }}%. This catches
+        hesitation, not error — the model's worst mistakes arrive at 90%+ and sail
+        straight through this gate.
+      </p>
+    </div>
+    <div class="outcome-metric"><span class="metric-val muted">—</span></div>
+  </div>
+
+  <div class="outcome">
+    <div class="outcome-key"><span class="chip chip-mute">Invalid image</span></div>
+    <div class="outcome-body">
+      <p class="outcome-name">The file could not be decoded</p>
+      <p class="outcome-note">
+        Extensions are checked against {{ allowed_extensions|join(', ') }}, and the file is
+        then actually decoded — renaming a PDF to <code>.jpg</code> will not get it through.
+      </p>
+    </div>
+    <div class="outcome-metric"><span class="metric-val muted">400</span></div>
+  </div>
+
+  <div class="outcome">
+    <div class="outcome-key"><span class="chip chip-mute">Too large</span></div>
+    <div class="outcome-body">
+      <p class="outcome-name">Upload exceeded {{ max_upload_mb }} MB</p>
+      <p class="outcome-note">Whole-slide scans will hit this. It expects a single field.</p>
+    </div>
+    <div class="outcome-metric"><span class="metric-val muted">413</span></div>
+  </div>
+
+  <p class="outcome-footnote">
+    One thing worth knowing before you read any result: a logistic regression on six
+    numbers — the average colour of the image, with no spatial information at all — scores
+    <strong>better</strong> than this model on balanced accuracy and carcinoma recall. Much
+    of what looks like classification here is staining and illumination, not cytology.
+  </p>
+</div>
 
 <footer>
-  <p>
-    Uploaded images are held in memory for the lifetime of the request and never written to disk.
-    Any preview shown is a downscaled copy embedded directly in this page.
-  </p>
+  <p>Uploaded images are held in memory for the lifetime of the request and never written to disk.</p>
+  <p>Trained on Mendeley LBC (CC BY 4.0) · 962 images from 61 slides</p>
 </footer>
 
+</div>
 </body>
 </html>
