@@ -11,8 +11,9 @@ Three things came out of that, and none of them flatter the model:
 
 1. A logistic regression on **six colour numbers** matches the CNN, and beats it
    on balanced accuracy and carcinoma recall.
-2. The model **essentially cannot detect squamous cell carcinoma** — mean recall
-   0.153 across folds, 0.00 on the shipped split.
+2. The model **essentially cannot detect squamous cell carcinoma** — 7 of the
+   dataset's 74 carcinoma fields recovered across folds, a pooled recall of
+   0.09, and 0.00 on the shipped split.
 3. Fold-to-fold variance is so large that any single-split number from this
    dataset, including the one this repo ships, is untrustworthy alone.
 
@@ -51,6 +52,11 @@ logistic regression on those six numbers. Evaluated with the same slide-grouped
 | Macro-F1 | 0.627 | **0.663** |
 | **SCC recall** | **0.435** | 0.153 |
 
+Both columns are fold means, so they compare like with like. `docs/baseline_metrics.json`
+does not record per-fold support, so the baseline cannot be pooled the way the
+CNN can — and pooling only one side would manufacture a gap. Pooled properly,
+the CNN's SCC recall falls further, to 0.095; see [MODEL_CARD.md](MODEL_CARD.md).
+
 The baseline wins on balanced accuracy and gets nearly **three times** the
 carcinoma recall. The CNN's only clear win is raw accuracy, which is dominated
 by NILM at 64% of the data.
@@ -85,8 +91,8 @@ illumination signature rather than its pathology.
 
 Do that, and you get a model that appears to detect carcinoma nine times out of
 ten. Split by slide instead, and on this split it detects carcinoma **zero**
-times out of fifteen — cross-validated across every slide, 0.15. Both numbers
-came from the same code, minutes apart.
+times out of fifteen — and across every slide, 7 carcinoma fields out of 74.
+Both numbers came from the same code, minutes apart.
 
 Published work on this dataset routinely reports accuracy in the high nineties.
 
@@ -124,19 +130,26 @@ Every number above rests on a single held-out slide per rare class. To check
 whether they are real or an accident of which slide landed in test, every slide
 was rotated through the test fold — 4-fold, grouped by slide:
 
-| Class | Mean recall | Min | Max | Per-fold |
-|---|---:|---:|---:|---|
-| HSIL | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
-| LSIL | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
-| NILM | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
-| **SCC** | **0.153** | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+| Class | Pooled recall | Recovered | Fold mean | Min | Max | Per-fold |
+|---|---:|---:|---:|---:|---:|---|
+| HSIL | 0.767 | 125 / 163 | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
+| LSIL | 0.858 | 97 / 113 | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
+| NILM | 0.956 | 585 / 612 | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
+| **SCC** | **0.095** | **7 / 74** | 0.153 | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+
+Pooled recall is the share of that class's images the model recovered across all
+folds. Because the folds partition the dataset, it is exact. The fold mean is
+shown beside it because the two disagree on SCC and the mean is the kinder
+number: SCC support ranges from 11 test images to 27, and the only fold where it
+scored at all held the fewest. Regenerate with `python metrics_summary.py`.
 
 Accuracy 0.849 (0.808–0.937) · balanced accuracy 0.689 (0.590–0.840) · macro-F1
 0.663 (0.581–0.834).
 
 This changes two things. **SCC is not reliably 0.00** — one fold reached 0.55, so
-the shipped split's zero is the worst case rather than the universal one. Mean
-0.15 is still a model that misses roughly six carcinoma fields in seven.
+the shipped split's zero is the worst case rather than the universal one. Pooled
+across every carcinoma image in the dataset it is 0.095: a model that misses
+roughly ten carcinoma fields in eleven.
 
 More importantly, **the spread is enormous**. HSIL recall ranges from 0.39 to
 1.00 depending only on which slides were held out. Macro-F1 moves by 0.25. With

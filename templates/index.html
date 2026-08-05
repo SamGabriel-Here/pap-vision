@@ -279,11 +279,12 @@
 <div class="disclaimer">
   <div class="head">⚠ Not a medical device · Not for diagnostic use</div>
   <p>
-    This model has been evaluated, and <strong>it fails</strong>. Cross-validated recall on
-    squamous cell carcinoma is <strong>0.15</strong> — it misses roughly six carcinoma fields
-    in seven, usually calling them HSIL with high confidence. A logistic regression on six
-    colour numbers scores better. It is not calibrated and has never been validated on
-    clinical slides.
+    This model has been evaluated, and <strong>it fails</strong>. Across every slide in the
+    dataset it found <strong>{{ scc.recovered }} of {{ scc.support }}</strong> squamous cell
+    carcinoma fields — a recall of <strong>{{ '%.2f'|format(scc.recall) }}</strong>. It misses
+    almost every carcinoma it is shown, usually calling it HSIL with high confidence. A
+    logistic regression on six colour numbers scores better. It is not calibrated and has
+    never been validated on clinical slides.
   </p>
   <p>
     It is not a substitute for examination by a qualified cytopathologist. Do not use any

@@ -16,6 +16,7 @@ from PIL import Image, UnidentifiedImageError
 from torchvision import models
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from metrics_summary import class_recall_summary
 from preprocessing import CLASS_NAMES, build_eval_transform
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
@@ -42,11 +43,29 @@ CLASS_MEANINGS = {
 # What the model's measured behaviour is for each class, shown in the UI so a
 # result is never presented without the evidence about how much to trust it.
 # Figures are from 4-fold slide-grouped cross-validation — see MODEL_CARD.md.
+#
+# The numbers are derived from docs/cv_metrics.json rather than typed here, and
+# they are pooled across folds rather than averaged. Averaging was the bug: it
+# gave SCC 0.15 when the model had in fact recovered 7 carcinoma fields out of
+# 74, because the fold with the fewest SCC images was the only one that scored.
+# See metrics_summary.py.
+CV_RECALL = class_recall_summary()
+
+CLASS_NOTES = {
+    "NILM": "Most reliable class, and the easiest — 64% of the training data.",
+    "LSIL": "Looks strong, but only four LSIL slides exist in the whole dataset.",
+    "HSIL": "Swings enormously depending on which slides are held out.",
+    "SCC": "Effectively broken. Usually returns HSIL instead, with high confidence.",
+}
+
 CLASS_RELIABILITY = {
-    "NILM": ("0.96", "Most reliable class, and the easiest — 64% of the training data."),
-    "LSIL": ("0.89", "Looks strong, but every test image came from a single slide."),
-    "HSIL": ("0.76", "Swings between 0.39 and 1.00 depending on which slides are held out."),
-    "SCC": ("0.15", "Effectively broken. Usually returns HSIL instead, with high confidence."),
+    name: (
+        f"{CV_RECALL[name].recall:.2f}",
+        f"{CLASS_NOTES[name]} {CV_RECALL[name].recovered} of "
+        f"{CV_RECALL[name].support} images recovered; per-fold "
+        f"{CV_RECALL[name].minimum:.2f}–{CV_RECALL[name].maximum:.2f}.",
+    )
+    for name in CLASS_NAMES
 }
 
 ALLOWED_ORIGINS = [
@@ -224,6 +243,10 @@ def template_globals():
         "meanings": CLASS_MEANINGS,
         "reliability": CLASS_RELIABILITY,
         "class_names": SEVERITY_ORDER,
+        # The disclaimer states the carcinoma failure in plain counts. It is
+        # derived, not typed, because the typed version of this same sentence
+        # is what carried the overstated 0.15 for as long as it did.
+        "scc": CV_RECALL["SCC"],
         "threshold_percent": int(CONFIDENCE_THRESHOLD * 100),
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "allowed_extensions": sorted(ALLOWED_EXTENSIONS),

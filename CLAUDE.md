@@ -83,7 +83,9 @@ guarantee.
 `baseline.py` reduces each image to per-channel RGB mean and std (six numbers,
 no spatial information) and fits a logistic regression. Under the same
 slide-grouped 4-fold protocol it gets balanced accuracy **0.748 vs the CNN's
-0.689**, and SCC recall **0.435 vs 0.153**.
+0.689**, and SCC recall **0.435 vs 0.153** (both fold means, so they compare
+like with like — the baseline's published metrics do not record per-fold support,
+so it cannot be pooled the way the CNN is elsewhere).
 
 A model that cannot see a cell should not beat one trained on cytology. Most of
 this dataset's separability is staining and illumination signature, not
@@ -97,8 +99,15 @@ learning morphology. If both collapse, the dataset cannot support the task.
 ## The model does not work, and that is the deliverable
 
 Retrained 29 July 2026 on Mendeley LBC with a slide-grouped split.
-**SCC recall is 0.00 on the shipped split and 0.153 cross-validated** (4-fold,
-grouped by slide; per-fold 0.00 · 0.00 · 0.07 · 0.55). Overall accuracy 0.915.
+**SCC recall is 0.00 on the shipped split and 0.095 cross-validated** — 7 of the
+dataset's 74 carcinoma fields (4-fold, grouped by slide; per-fold 0.00 · 0.00 ·
+0.07 · 0.55). Overall accuracy 0.915.
+
+Quote the **pooled** figure, not the fold mean. The folds carry unequal support
+— SCC ranges from 11 test images to 27 — so averaging the fold recalls lets the
+smallest fold set the headline, and the smallest fold is the only one where SCC
+scored. That is how 0.095 got published as 0.153 across five files. Derive it
+with `metrics_summary.py`; never retype it.
 
 The cross-validation also found enormous fold-to-fold variance — HSIL recall
 spans 0.39 to 1.00 purely on which slides are held out. **Never quote a

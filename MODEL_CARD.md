@@ -8,9 +8,10 @@
 
 This model **essentially cannot detect squamous cell carcinoma**. On the shipped
 split it identified none of the 15 held-out carcinoma images, classifying every
-one as HSIL. Across 4-fold slide-grouped cross-validation its SCC recall
-averages **0.153** (range 0.00–0.55) — it misses roughly six carcinoma fields in
-seven. In a screening context that is the worst failure mode available.
+one as HSIL. Across 4-fold slide-grouped cross-validation it recovered **7 of
+the dataset's 74 carcinoma fields — a pooled recall of 0.09** (per-fold 0.00,
+0.00, 0.07, 0.55). It misses roughly ten carcinoma fields in eleven. In a
+screening context that is the worst failure mode available.
 
 It is published because the failure is informative, not because the model works.
 
@@ -86,12 +87,25 @@ Balanced accuracy **0.724**, macro-F1 **0.693**.
 The metrics above rest on one held-out slide per rare class, so they were
 re-measured with 4-fold cross-validation grouped by slide.
 
-| Class | Mean recall | Min | Max | Per-fold |
-|---|---:|---:|---:|---|
-| HSIL | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
-| LSIL | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
-| NILM | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
-| **SCC** | **0.153** | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+Recall below is **pooled**, not averaged: images of that class the model
+recovered, divided by how many the dataset contains. The folds partition the
+data, so each image is a test image exactly once and pooling is exact. The fold
+mean is shown beside it because for SCC the two disagree badly, and the mean is
+the flattering one.
+
+| Class | Pooled recall | Recovered | Fold mean | Min | Max | Per-fold |
+|---|---:|---:|---:|---:|---:|---|
+| HSIL | 0.767 | 125 / 163 | 0.758 | 0.39 | 1.00 | 0.81 · 0.39 · 1.00 · 0.83 |
+| LSIL | 0.858 | 97 / 113 | 0.890 | 0.59 | 1.00 | 0.59 · 0.96 · 1.00 · 1.00 |
+| NILM | 0.956 | 585 / 612 | 0.956 | 0.84 | 1.00 | 1.00 · 1.00 · 0.84 · 0.99 |
+| **SCC** | **0.095** | **7 / 74** | 0.153 | **0.00** | **0.55** | 0.00 · 0.00 · 0.07 · 0.55 |
+
+SCC is where averaging misleads. Its fold support ranges from 11 test images to
+27, and the only fold in which it scored above 0.07 was the fold holding the
+fewest carcinoma images. Weighting that fold equally with a fold more than twice
+its size lifts the headline from 0.095 to 0.153 — a 62% overstatement of the one
+number a screening model is judged on. Regenerate the table with
+`python metrics_summary.py`.
 
 Accuracy 0.849 (0.808–0.937) · balanced accuracy 0.689 (0.590–0.840) · macro-F1
 0.663 (0.581–0.834). Full detail in [docs/cv_metrics.json](docs/cv_metrics.json),
@@ -100,7 +114,8 @@ reproducible with `cross_validate.py`.
 Two conclusions, and the second matters more:
 
 1. **SCC is not reliably zero.** One fold reached 0.55. The shipped split's 0.00
-   is the worst case, not the universal one. A mean of 0.153 is still unusable.
+   is the worst case, not the universal one. Pooled across every carcinoma image
+   in the dataset it is 0.095, which is still unusable.
 2. **The variance is the real finding.** HSIL recall spans 0.39 to 1.00 purely on
    which slides were held out. With 61 slides and only 4 in each rare class, a
    single split measures the split as much as the model. Any single-split number
@@ -125,6 +140,11 @@ slide-grouped 4-fold protocol:
 | Macro-F1 | 0.627 | **0.663** |
 | **SCC recall** | **0.435** | 0.153 |
 
+Both columns are fold means. `docs/baseline_metrics.json` does not record
+per-fold support, so the baseline cannot be pooled the way the table above pools
+this model, and pooling one side alone would invent a gap that the measurement
+does not support. On the pooled figure this model does worse still — 0.095.
+
 The baseline wins balanced accuracy and takes nearly three times the carcinoma
 recall. A model that cannot see a cell should not be competitive here. That it
 is means the separability in this dataset is largely **staining and illumination
@@ -145,7 +165,7 @@ Reproduce with `baseline.py`; results in [docs/baseline_metrics.json](docs/basel
 ## Known failure modes
 
 **SCC is barely predicted at all.** All 15 carcinoma images in the shipped test
-split were classified as HSIL, and cross-validated recall averages 0.153. The
+split were classified as HSIL, and pooled cross-validated recall is 0.095. The
 model sees 2–3 SCC slides in training and does not generalise to an unseen one.
 This is not a threshold artefact — on the shipped split, SCC is not the argmax
 for any test image.
@@ -182,7 +202,7 @@ slide — so images from one slide land on both sides of the boundary:
 | **SCC recall** | **0.00** | **0.89** | **+0.89** |
 
 The leaky split reports a model that detects carcinoma nine times in ten. The
-grouped split shows it detecting none of them here, and 0.153 cross-validated.
+grouped split shows it detecting none of them here, and 7 in 74 across all folds.
 Both numbers come from the same code, minutes apart. This is the single most
 important thing in this repository.
 

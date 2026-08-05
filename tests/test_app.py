@@ -8,6 +8,7 @@ from PIL import Image
 from werkzeug.datastructures import FileStorage
 
 import app as papvision
+from metrics_summary import class_recall_summary
 
 
 def make_image_bytes(fmt="PNG", size=(64, 64), color=(200, 150, 180), mode="RGB"):
@@ -346,6 +347,18 @@ def test_model_metadata_matches_checkpoint_and_serving_constants():
     assert papvision.MODEL_METADATA["confidence_threshold"] == papvision.CONFIDENCE_THRESHOLD
 
 
+def test_metadata_sidecar_quotes_the_pooled_scc_recall_not_the_fold_mean():
+    """The sidecar travels with the weights, so a stale figure here outlives
+    any correction made only in the README."""
+    scc = class_recall_summary()["SCC"]
+    metrics = papvision.MODEL_METADATA["metric_summary"]
+
+    assert metrics["cv_scc_images_recovered"] == scc.recovered
+    assert metrics["cv_scc_images_total"] == scc.support
+    assert metrics["cv_scc_recall_pooled"] == pytest.approx(scc.recall, abs=5e-5)
+    assert "cv_scc_recall_mean" not in metrics
+
+
 def test_model_metadata_rejects_class_order_drift(tmp_path):
     model_file = tmp_path / "model.pth"
     model_file.write_bytes(b"checkpoint")
@@ -373,7 +386,47 @@ def test_model_metadata_rejects_checkpoint_drift(tmp_path):
 
 
 def test_the_scc_entry_says_it_is_broken(client):
-    """The one result a user most needs warned about."""
+    """The one result a user most needs warned about.
+
+    The figure is recomputed from the published fold metrics rather than typed
+    in, because typing it in is exactly how this went wrong: the UI showed
+    0.15, the unweighted mean of four folds of unequal size, while the model
+    had actually recovered 7 of 74 carcinoma fields — 0.09.
+    """
+    scc = class_recall_summary()["SCC"]
+    assert scc.recovered == 7 and scc.support == 74
+
     body = client.get("/").get_data(as_text=True)
-    assert "0.15" in body
+    assert f"{scc.recall:.2f}" in body
     assert "Effectively broken" in body
+    assert "0.15" not in body, "the flattering fold mean must not reappear"
+
+
+def test_displayed_recall_is_pooled_and_never_the_fold_mean(client):
+    """Guards the whole class of error, not just the SCC instance of it.
+
+    Every figure the interface quotes must equal images recovered over images
+    of that class. For SCC the two statistics differ by 62%, so a regression
+    here would be silent under any test that only checked the number's shape.
+    """
+    summary = class_recall_summary()
+
+    for name in papvision.CLASS_NAMES:
+        stats = summary[name]
+        shown = papvision.CLASS_RELIABILITY[name][0]
+        assert shown == f"{stats.recovered / stats.support:.2f}", name
+
+    assert f"{summary['SCC'].fold_mean:.2f}" != f"{summary['SCC'].recall:.2f}"
+
+
+def test_every_recall_is_shown_with_its_fold_range_beside_it(client):
+    """A single number from this dataset is not interpretable on its own —
+    HSIL recall alone spans 0.39 to 1.00 depending on the held-out slides."""
+    body = client.get("/").get_data(as_text=True)
+    summary = class_recall_summary()
+
+    for name in papvision.CLASS_NAMES:
+        stats = summary[name]
+        span = f"{stats.minimum:.2f}–{stats.maximum:.2f}"
+        assert span in papvision.CLASS_RELIABILITY[name][1], name
+        assert span in body, name

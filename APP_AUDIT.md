@@ -48,7 +48,7 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 
 ## Issues and risks
 
-1. **The shipped model is not useful for clinical interpretation.** Cross-validated SCC recall is about 0.15, and the shipped split has 0.00 SCC recall. This is acknowledged clearly, but it remains the central app limitation.
+1. **The shipped model is not useful for clinical interpretation.** Pooled across the cross-validation folds the model recovered 7 of the dataset's 74 carcinoma fields — SCC recall 0.095 — and the shipped split has 0.00. This audit originally quoted 0.15 here, the unweighted fold mean, which overstates it by 62%; see `metrics_summary.py`. This is acknowledged clearly, but it remains the central app limitation.
 2. **The 0.90 softmax gate does not protect against confident errors.** The model can call SCC images HSIL with high confidence, so the gate catches hesitation rather than correctness.
 3. **Softmax scores are uncalibrated.** The UI describes them as not probabilities of correctness. The API now also exposes `softmax_score` alongside `confidence` to reduce the misleading name, but no calibration (temperature scaling, ECE) has been fitted.
 4. **There is no out-of-distribution rejection.** Precisely characterized, not assumed: flat, saturated colour swatches (verified example `RGB(128, 224, 96)` → `NILM` at 92.42%) clear the 90% gate, while pure random pixel noise does not (max 37.25% across 200 trials). Pinned by `tests/test_app.py::test_a_solid_colour_swatch_clears_the_gate_as_a_false_positive` against the real checkpoint.

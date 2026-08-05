@@ -25,7 +25,11 @@
   "confidence_threshold": 0.9,
   "intended_use": "Research and educational use only. Not a medical device.",
   "metric_summary": {
-    "cv_scc_recall_mean": 0.153,
+    "_note": "Recall is pooled across the 4 folds (images recovered / images of that class), not averaged over folds. The folds carry unequal support, so the fold mean overstates SCC by 62%: 0.153 averaged versus 0.095 pooled. Derive these with metrics_summary.py; do not hand-edit.",
+    "cv_scc_recall_pooled": 0.0946,
+    "cv_scc_recall_per_fold": [0.0, 0.0, 0.0667, 0.5455],
+    "cv_scc_images_recovered": 7,
+    "cv_scc_images_total": 74,
     "cv_balanced_accuracy_mean": 0.689,
     "cv_macro_f1_mean": 0.663
   }
