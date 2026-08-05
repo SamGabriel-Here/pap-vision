@@ -51,3 +51,52 @@ jobs:
           curl -sf http://localhost:8080/health
           docker logs papvision-ci
           docker rm -f papvision-ci
+
+  docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start app + redis
+        run: docker compose up -d --build
+      - name: Wait for health check
+        run: |
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "health check passed"; break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/health
+      - name: Verify Redis-backed rate limit is exact across gunicorn workers
+        # Regression test for a bug found while validating this stack by hand:
+        # plain `docker run` with memory:// storage let more requests through
+        # than PAPVISION_PREDICT_RATE_LIMIT under concurrent load, because
+        # each of the 2 gunicorn workers kept its own counter. This asserts
+        # the fix (Redis-backed storage) still holds exactly.
+        run: |
+          docker compose down
+          PAPVISION_PREDICT_RATE_LIMIT="3 per minute" docker compose up -d
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8080/health > /dev/null; then break; fi
+            sleep 2
+          done
+          python3 -m pip install --quiet pillow
+          python3 -c "
+          from PIL import Image
+          Image.new('RGB', (64, 64), (200, 150, 180)).save('/tmp/ratelimit_probe.png')
+          "
+          codes=$(for i in $(seq 1 12); do
+            curl -s -o /dev/null -w "%{http_code}\n" -X POST -F "file=@/tmp/ratelimit_probe.png" http://localhost:8080/predict &
+          done; wait)
+          ok=$(echo "$codes" | grep -c "^200$" || true)
+          too_many=$(echo "$codes" | grep -c "^429$" || true)
+          echo "200s: $ok, 429s: $too_many"
+          echo "$codes"
+          docker compose logs
+          if [ "$too_many" -lt 9 ]; then
+            echo "Expected at least 9 of 12 concurrent requests to be rejected (limit=3); got $too_many"
+            exit 1
+          fi
+      - name: Tear down
+        if: always()
+        run: docker compose down

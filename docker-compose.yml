@@ -1,0 +1,32 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Shared rate-limit storage across gunicorn's 2 workers. Without this,
+      # each worker keeps its own in-memory counter and the effective
+      # /predict rate limit can exceed PAPVISION_PREDICT_RATE_LIMIT under
+      # concurrent load (see README "Known limitations" for the measured
+      # numbers).
+      PAPVISION_RATE_LIMIT_STORAGE_URI: redis://redis:6379
+      PAPVISION_PREDICT_RATE_LIMIT: ${PAPVISION_PREDICT_RATE_LIMIT:-20 per minute}
+      PAPVISION_ALLOWED_ORIGINS: ${PAPVISION_ALLOWED_ORIGINS:-http://localhost:8080}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

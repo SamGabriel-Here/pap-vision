@@ -271,6 +271,21 @@ Docker `HEALTHCHECK` against `/health`. Built and run locally against this
 checkpoint: `docker build` succeeds, `/health` returns `200`, and `/predict`
 returns real inference output from inside the container.
 
+With `docker-compose.yml`, the app runs alongside Redis so the 2 gunicorn
+workers share one rate-limit counter (see the caveat under "Known
+limitations" below):
+
+```bash
+docker compose up -d --build
+curl http://localhost:8080/health
+```
+
+Verified locally: with `PAPVISION_PREDICT_RATE_LIMIT="3 per minute"`, 12
+concurrent requests against the compose stack returned exactly 3 successes
+and 9 `429`s — confirmed the Redis key
+(`LIMITS:LIMITER/<ip>/predict/3/1/minute`) is shared across both workers,
+unlike the plain `docker run` setup above with default `memory://` storage.
+
 ### Configuration
 
 | Variable | Default | Purpose |
@@ -367,12 +382,17 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 - ~~No rate limiting on `/predict`.~~ Fixed: `flask-limiter` on `/predict` and `POST /`,
   20 requests/minute per client IP by default (`PAPVISION_PREDICT_RATE_LIMIT`).
   Verified against the real running container. One caveat found while
-  verifying it: the default `memory://` storage keeps a separate counter per
-  gunicorn worker, so under concurrent load with 2 workers the effective
-  ceiling can be up to double the configured limit — confirmed empirically
-  (12 concurrent requests against a 3/minute limit let 4 through, not 3).
-  Exact enforcement across workers needs `PAPVISION_RATE_LIMIT_STORAGE_URI`
-  pointed at Redis.
+  verifying it: plain `docker run` (default `memory://` storage) keeps a
+  separate counter per gunicorn worker, so under concurrent load with 2
+  workers the effective ceiling can be up to double the configured limit —
+  confirmed empirically (12 concurrent requests against a 3/minute limit let
+  4 through, not 3). `docker-compose.yml` fixes this by running Redis
+  alongside the app and setting `PAPVISION_RATE_LIMIT_STORAGE_URI` — rerunning
+  the identical 12-concurrent-request test against the compose stack returned
+  exactly 3 successes and 9 rejections, with a single shared key visible in
+  Redis. Plain `docker run`/bare `gunicorn` without Redis still has the gap;
+  use `docker-compose.yml` or point `PAPVISION_RATE_LIMIT_STORAGE_URI` at
+  your own Redis for exact enforcement.
 - The checkpoint is committed to git rather than stored as a release asset.
 - Each gunicorn worker loads its own copy of the model; no batching.
 - No structured request logging or latency metrics.
@@ -422,7 +442,7 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 
 ### v0.6 — Deployment and reproducibility
 
-- [x] Dockerfile
+- [x] Dockerfile and `docker-compose.yml`
 - [x] GitHub Actions running lint and tests on push
 - [x] Unit tests for preprocessing, the confidence gate, and both error paths
 - [ ] Move `cervical_model.pth` to a release asset
