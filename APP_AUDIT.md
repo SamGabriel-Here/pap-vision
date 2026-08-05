@@ -63,7 +63,7 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 
 ### Engineering (remaining)
 
-- Wire model checksum re-verification into CI so a checkpoint update without a matching `model_metadata.json` update fails the build (today it would fail at container startup instead, which is safe but later than ideal).
+None identified that are both low-risk and independently verifiable without new user-specified requirements. Note: checksum enforcement in CI is already effectively covered — `app.py` validates the checkpoint against `model_metadata.json` at import time, so `pytest` in CI already fails hard on any mismatch (verified locally by corrupting the recorded hash and re-running the suite, which failed at collection with `RuntimeError: Model checkpoint checksum mismatch`, then restoring it and confirming `72 passed` again).
 
 ### Research
 
