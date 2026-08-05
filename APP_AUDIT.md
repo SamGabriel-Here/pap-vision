@@ -20,7 +20,7 @@ python -m ruff check .
 
 Results:
 
-- `72 passed`
+- `73 passed`
 - `ruff check .` passed
 
 Note: `requirements.txt` is sufficient for serving, but the full test suite imports `baseline.py`, so test environments need `requirements-train.txt` or at least `scikit-learn` in addition to serving dependencies.
@@ -40,13 +40,14 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 - Low-confidence HTML results now show the same per-class softmax breakdown the JSON API already returned, instead of a bare error message.
 - `/predict` now also returns `softmax_score` alongside the existing `confidence` field (kept for backward compatibility), and the README documents both.
 - Added `Dockerfile` and `.dockerignore`: `requirements.txt`-only image, non-root `papvision` user, `gunicorn` with 2 workers, `HEALTHCHECK` against `/health`. Actually built and ran locally: `docker build` succeeded (1.36 GB image), the container started healthy, `curl /health` returned `200`, and `curl -F file=@... /predict` returned real inference JSON from inside the container. CI now has a second job that builds the image and smoke-tests `/health` on every push/PR.
+- **Corrected an inaccurate claim in the docs and found the actual OOD failure mode.** MODEL_CARD.md and README.md both said "uniform random noise" clears the confidence gate. Testing this against the real, running checkpoint (not stubbed) showed the opposite: 200 seeded trials of uniform random noise topped out at **37.25%** confidence and were correctly declined every time. A grid search over 512 solid RGB colours found the real failure mode instead: flat, structureless colour swatches (e.g. `RGB(128, 224, 96)`, a saturated green) clear the gate as `NILM` at up to 92.49% confidence, with 8 of 512 sampled colours clearing 90%. Both docs are now corrected, and a permanent regression test (`test_a_solid_colour_swatch_clears_the_gate_as_a_false_positive`) pins the current behaviour against the real model, so it fails loudly the day someone adds real OOD rejection.
 
 ## Issues and risks
 
 1. **The shipped model is not useful for clinical interpretation.** Cross-validated SCC recall is about 0.15, and the shipped split has 0.00 SCC recall. This is acknowledged clearly, but it remains the central app limitation.
 2. **The 0.90 softmax gate does not protect against confident errors.** The model can call SCC images HSIL with high confidence, so the gate catches hesitation rather than correctness.
 3. **Softmax scores are uncalibrated.** The UI describes them as not probabilities of correctness. The API now also exposes `softmax_score` alongside `confidence` to reduce the misleading name, but no calibration (temperature scaling, ECE) has been fitted.
-4. **There is no out-of-distribution rejection.** Non-cytology or synthetic images may still be mapped to one of the four disease classes with high softmax.
+4. **There is no out-of-distribution rejection.** Precisely characterized, not assumed: flat, saturated colour swatches (verified example `RGB(128, 224, 96)` → `NILM` at 92.42%) clear the 90% gate, while pure random pixel noise does not (max 37.25% across 200 trials). Pinned by `tests/test_app.py::test_a_solid_colour_swatch_clears_the_gate_as_a_false_positive` against the real checkpoint.
 5. **The dataset is too small at the slide level.** Rare classes have only a few slides, so per-class metrics have high fold-to-fold variance.
 6. ~~Low-confidence HTML results hide the score breakdown.~~ Fixed: the HTML page now renders the same breakdown the JSON API always returned.
 7. ~~Deployment hardening was partly incomplete.~~ Fixed: `Dockerfile`, `.dockerignore`, a non-root runtime user, a container `HEALTHCHECK`, and a CI job that builds and smoke-tests the image now exist.

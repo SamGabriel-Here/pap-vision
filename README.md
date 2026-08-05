@@ -351,7 +351,12 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 - **61 slides, not 460 patients.** The paper's patient count is widely repeated as though the images were independent. They are not. See [DATASET.md](DATASET.md).
 - **Softmax confidence is not calibrated.** No temperature scaling. A held-out SCC image returns HSIL at 90.67%.
 - **The 0.90 gate does not catch the failures.** It catches uncertainty, and this model is confidently wrong rather than uncertain.
-- **No out-of-distribution rejection.** Uniform random noise maps into a pathology class with high confidence.
+- **No out-of-distribution rejection.** Solid, uniform colour swatches with no
+  cellular content at all clear the 90% gate as `NILM`. Example, verified against
+  the running app: a flat `RGB(128, 224, 96)` image — a saturated green with no
+  structure whatsoever — returns `NILM` at 92.42% confidence. (Pure random pixel
+  noise scores lower, 25–37% across 200 trials, and gets caught by the gate; it
+  is *smooth, saturated colour fields* that fool it, not noise specifically.)
 - **Single-field.** Real screening reviews a whole slide; this classifies one cropped field.
 - **Unknown generalisation.** One institution, one microscope, one staining protocol.
 

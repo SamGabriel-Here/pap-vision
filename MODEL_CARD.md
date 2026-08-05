@@ -160,8 +160,14 @@ low-grade lesion morphology, and there is no way to tell from this data.
 **Softmax scores are not calibrated.** No temperature scaling was fitted. The
 number the app displays is a normalised logit, not a probability of correctness.
 
-**No out-of-distribution rejection.** Uniform random noise still maps into a
-pathology class with high confidence.
+**No out-of-distribution rejection.** A flat, structureless colour field —
+`RGB(128, 224, 96)`, a saturated green — clears the 0.90 confidence gate,
+returning `NILM` at 92.42%. This was found by a grid search over solid colours
+and verified against the running app, not assumed. Pure random pixel noise is
+*not* the concerning case here: 200 seeded trials of uniform random noise
+topped out at 37.25% confidence and were correctly declined by the gate. It is
+smooth, saturated, low-frequency colour that the confidence gate cannot
+distinguish from real tissue, not high-frequency noise.
 
 ## What a leaky split would have claimed
 

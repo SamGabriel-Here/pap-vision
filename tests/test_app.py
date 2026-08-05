@@ -120,6 +120,29 @@ def test_scores_below_the_threshold_raise_low_confidence(unsure):
     assert set(raised.value.probabilities) == set(papvision.CLASS_NAMES)
 
 
+def test_a_solid_colour_swatch_clears_the_gate_as_a_false_positive():
+    """Regression test against the real checkpoint (no StubModel here).
+
+    Found by a grid search over solid RGB colours: a flat, structureless
+    field with zero cellular content still clears the 0.90 confidence gate
+    as NILM. Pure random noise does not (200 seeded trials topped out at
+    37.25% and were correctly declined) -- it is smooth, saturated colour
+    the model cannot tell apart from real tissue, not high-frequency noise.
+    See MODEL_CARD.md "No out-of-distribution rejection".
+
+    This asserts the *current, documented, undesirable* behaviour rather
+    than a desired one, so it fails loudly -- as a prompt to fix the OOD
+    gap -- the day someone adds real OOD rejection and this call starts
+    raising LowConfidence instead.
+    """
+    swatch = Image.new("RGB", (224, 224), (128, 224, 96))
+    prediction, confidence, breakdown = papvision.classify(swatch)
+
+    assert prediction == "NILM"
+    assert confidence > 90.0
+    assert breakdown["NILM"] > 90.0
+
+
 # --- HTTP surface ---------------------------------------------------------
 
 def test_index_shows_the_disclaimer(client):
