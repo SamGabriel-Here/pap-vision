@@ -293,6 +293,7 @@ unlike the plain `docker run` setup above with default `memory://` storage.
 | `PAPVISION_ALLOWED_ORIGINS` | `http://localhost:8080` | Comma-separated CORS allowlist for `/predict` |
 | `PAPVISION_PREDICT_RATE_LIMIT` | `20 per minute` | Per-client-IP limit on `/predict` and `POST /`, in [flask-limiter](https://flask-limiter.readthedocs.io/) syntax |
 | `PAPVISION_RATE_LIMIT_STORAGE_URI` | `memory://` | Rate-limit counter backend. `memory://` is per-process — exact with 1 gunicorn worker, but each additional worker or replica keeps its own counter, so the effective ceiling scales with worker count. Point at Redis (e.g. `redis://redis:6379`) for an exact shared limit across workers/replicas. |
+| `PAPVISION_TRUST_PROXY_HOPS` | `0` | Number of trusted reverse proxies in front of this process. `0` (default) rate-limits by the raw TCP peer address and ignores `X-Forwarded-For` entirely — safe with no proxy, but every client behind a reverse proxy then shares one rate-limit bucket (confirmed: exhausting the limit as one client blocks every other client too). Set to the exact proxy hop count (usually `1`) so [`ProxyFix`](https://werkzeug.palletsprojects.com/en/stable/middleware/proxy_fix/) reads the real client IP from `X-Forwarded-For` at the right depth — confirmed this correctly separates clients again. Setting it with **no** real proxy in front lets any client set `X-Forwarded-For` itself and pick an arbitrary rate-limit identity, bypassing the limit; only set it when it is actually true. |
 
 Uploads are capped at 8 MB (`MAX_CONTENT_LENGTH`).
 
@@ -393,6 +394,15 @@ curl -F "file=@sample.png" http://localhost:8080/predict
   Redis. Plain `docker run`/bare `gunicorn` without Redis still has the gap;
   use `docker-compose.yml` or point `PAPVISION_RATE_LIMIT_STORAGE_URI` at
   your own Redis for exact enforcement.
+- Rate limiting keys on the raw TCP peer address by default and ignores
+  `X-Forwarded-For`. Deployed behind any reverse proxy without setting
+  `PAPVISION_TRUST_PROXY_HOPS`, every real client shares one rate-limit
+  bucket — confirmed empirically (one client exhausting the limit blocked
+  every other client too). Setting `PAPVISION_TRUST_PROXY_HOPS` fixes this
+  (confirmed: clients with different `X-Forwarded-For` values get separate
+  buckets again), but must only be set when a real proxy is actually there,
+  or clients can self-report an arbitrary rate-limit identity and bypass the
+  limit entirely.
 - The checkpoint is committed to git rather than stored as a release asset.
 - Each gunicorn worker loads its own copy of the model; no batching.
 - No structured request logging or latency metrics.

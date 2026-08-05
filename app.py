@@ -14,6 +14,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from PIL import Image, UnidentifiedImageError
 from torchvision import models
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from preprocessing import CLASS_NAMES, build_eval_transform
 
@@ -71,9 +72,29 @@ PREDICT_RATE_LIMIT = os.environ.get("PAPVISION_PREDICT_RATE_LIMIT", "20 per minu
 # or run with a single worker.
 RATE_LIMIT_STORAGE_URI = os.environ.get("PAPVISION_RATE_LIMIT_STORAGE_URI", "memory://")
 
+# get_remote_address (below) reads request.remote_addr, which is the raw TCP
+# peer address. Behind a reverse proxy (nginx, an ALB, Cloudflare -- the
+# normal way to run this in production) that address is always the proxy's
+# own IP, so every real client collapses into one shared rate-limit bucket
+# instead of being limited individually. Confirmed empirically: with a proxy
+# in front and no fix, exhausting the limit as one client blocks every other
+# client too.
+#
+# TRUST_PROXY_HOPS declares exactly how many reverse proxies sit in front of
+# this process, so Werkzeug's ProxyFix can pick the real client IP out of
+# X-Forwarded-For at the right depth. It defaults to 0 (off): trusting
+# X-Forwarded-For with no proxy in front lets any client set that header
+# itself and get an arbitrary, attacker-chosen rate-limit identity, which is
+# worse than the shared-bucket behavior it would "fix". Only set this when
+# there really is that many trusted proxies terminating client connections.
+TRUST_PROXY_HOPS = int(os.environ.get("PAPVISION_TRUST_PROXY_HOPS", "0"))
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 CORS(app, resources={r"/predict": {"origins": ALLOWED_ORIGINS}})
+
+if TRUST_PROXY_HOPS > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=TRUST_PROXY_HOPS)
 
 limiter = Limiter(
     key_func=get_remote_address,

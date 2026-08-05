@@ -275,6 +275,33 @@ def test_rate_limit_does_not_apply_to_get_requests(client):
         assert response.status_code == 200
 
 
+def test_rate_limit_ignores_x_forwarded_for_by_default(client, confident):
+    """PAPVISION_TRUST_PROXY_HOPS defaults to 0, so X-Forwarded-For must not
+    influence who gets rate-limited. Trusting it with no proxy in front would
+    let any client set an arbitrary rate-limit identity for itself and dodge
+    the limit entirely -- confirmed against a real container in this
+    session's investigation (docker run with no ProxyFix: two different
+    X-Forwarded-For values shared one bucket, exactly as asserted here)."""
+    assert papvision.TRUST_PROXY_HOPS == 0
+    limit = int(papvision.PREDICT_RATE_LIMIT.split()[0])
+
+    for _ in range(limit):
+        response = client.post(
+            "/predict",
+            data={"file": (io.BytesIO(make_image_bytes()), "smear.png")},
+            headers={"X-Forwarded-For": "1.1.1.1"},
+        )
+        assert response.status_code == 200
+
+    # A different claimed client IP must not open a fresh bucket.
+    blocked = client.post(
+        "/predict",
+        data={"file": (io.BytesIO(make_image_bytes()), "smear.png")},
+        headers={"X-Forwarded-For": "2.2.2.2"},
+    )
+    assert blocked.status_code == 429
+
+
 def test_security_headers_are_set(client):
     headers = client.get("/").headers
     assert headers["X-Content-Type-Options"] == "nosniff"
