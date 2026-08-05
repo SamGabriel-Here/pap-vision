@@ -222,6 +222,59 @@ def test_oversized_upload_is_refused(client):
     assert response.status_code == 413
 
 
+# --- rate limiting ----------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Every test gets a clean limiter bucket, so tests can't rate-limit
+    each other and rate-limit tests don't leak into later tests."""
+    papvision.limiter.reset()
+    yield
+    papvision.limiter.reset()
+
+
+def test_predict_is_rate_limited_per_client(client, confident):
+    limit = int(papvision.PREDICT_RATE_LIMIT.split()[0])
+
+    for _ in range(limit):
+        response = client.post(
+            "/predict", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
+        )
+        assert response.status_code == 200
+
+    blocked = client.post(
+        "/predict", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
+    )
+    assert blocked.status_code == 429
+    assert "Too many requests" in blocked.get_json()["error"]
+
+
+def test_index_post_is_also_rate_limited(client, confident):
+    limit = int(papvision.PREDICT_RATE_LIMIT.split()[0])
+
+    for _ in range(limit):
+        response = client.post(
+            "/", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
+        )
+        assert response.status_code == 200
+
+    blocked = client.post(
+        "/", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
+    )
+    assert blocked.status_code == 429
+    assert "Too many requests" in blocked.get_data(as_text=True)
+
+
+def test_rate_limit_does_not_apply_to_get_requests(client):
+    """A GET-heavy client (e.g. someone just loading the page repeatedly)
+    should never be throttled by the /predict-focused limit."""
+    limit = int(papvision.PREDICT_RATE_LIMIT.split()[0])
+
+    for _ in range(limit + 5):
+        response = client.get("/")
+        assert response.status_code == 200
+
+
 def test_security_headers_are_set(client):
     headers = client.get("/").headers
     assert headers["X-Content-Type-Options"] == "nosniff"

@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from PIL import Image, UnidentifiedImageError
 from torchvision import models
 
@@ -54,9 +56,31 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# Model inference is the expensive part of this service and there is no
+# batching, so an unthrottled /predict is a trivial CPU exhaustion vector.
+# 20 requests per minute per client IP by default; overridable for load
+# testing or when a trusted reverse proxy is doing this job instead.
+PREDICT_RATE_LIMIT = os.environ.get("PAPVISION_PREDICT_RATE_LIMIT", "20 per minute")
+
+# In-memory storage keeps a separate counter per *process*. The shipped
+# Dockerfile runs gunicorn with 2 workers, so under memory:// storage each
+# worker enforces its own copy of the same limit independently and the
+# effective ceiling under concurrent load can be up to (workers x limit),
+# not exactly limit. Point this at a shared backend such as Redis
+# (e.g. "redis://redis:6379") for an exact limit across workers/replicas,
+# or run with a single worker.
+RATE_LIMIT_STORAGE_URI = os.environ.get("PAPVISION_RATE_LIMIT_STORAGE_URI", "memory://")
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 CORS(app, resources={r"/predict": {"origins": ALLOWED_ORIGINS}})
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+)
 
 def file_sha256(path):
     digest = hashlib.sha256()
@@ -204,12 +228,21 @@ def upload_too_large(_error):
     return render_template("index.html", error=message), 413
 
 
+@app.errorhandler(429)
+def rate_limited(_error):
+    message = "Too many requests. Please wait a moment and try again."
+    if request.path == "/predict":
+        return jsonify({"error": message}), 429
+    return render_template("index.html", error=message), 429
+
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "classes": CLASS_NAMES})
 
 
 @app.route("/", methods=["GET", "POST"])
+@limiter.limit(PREDICT_RATE_LIMIT, methods=["POST"])
 def index():
     if request.method == "GET":
         return render_template("index.html")
@@ -241,6 +274,7 @@ def index():
 
 
 @app.route("/predict", methods=["POST"])
+@limiter.limit(PREDICT_RATE_LIMIT)
 def predict():
     try:
         image = read_upload(request.files.get("file"))

@@ -276,6 +276,8 @@ returns real inference output from inside the container.
 | Variable | Default | Purpose |
 |---|---|---|
 | `PAPVISION_ALLOWED_ORIGINS` | `http://localhost:8080` | Comma-separated CORS allowlist for `/predict` |
+| `PAPVISION_PREDICT_RATE_LIMIT` | `20 per minute` | Per-client-IP limit on `/predict` and `POST /`, in [flask-limiter](https://flask-limiter.readthedocs.io/) syntax |
+| `PAPVISION_RATE_LIMIT_STORAGE_URI` | `memory://` | Rate-limit counter backend. `memory://` is per-process — exact with 1 gunicorn worker, but each additional worker or replica keeps its own counter, so the effective ceiling scales with worker count. Point at Redis (e.g. `redis://redis:6379`) for an exact shared limit across workers/replicas. |
 
 Uploads are capped at 8 MB (`MAX_CONTENT_LENGTH`).
 
@@ -362,7 +364,15 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 
 **Engineering**
 
-- No rate limiting on `/predict`.
+- ~~No rate limiting on `/predict`.~~ Fixed: `flask-limiter` on `/predict` and `POST /`,
+  20 requests/minute per client IP by default (`PAPVISION_PREDICT_RATE_LIMIT`).
+  Verified against the real running container. One caveat found while
+  verifying it: the default `memory://` storage keeps a separate counter per
+  gunicorn worker, so under concurrent load with 2 workers the effective
+  ceiling can be up to double the configured limit — confirmed empirically
+  (12 concurrent requests against a 3/minute limit let 4 through, not 3).
+  Exact enforcement across workers needs `PAPVISION_RATE_LIMIT_STORAGE_URI`
+  pointed at Redis.
 - The checkpoint is committed to git rather than stored as a release asset.
 - Each gunicorn worker loads its own copy of the model; no batching.
 - No structured request logging or latency metrics.
@@ -391,7 +401,7 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 - [x] CORS narrowed to a configurable allowlist
 - [x] `torch.load(..., weights_only=True)`; no bare `except:`
 - [x] Pinned dependencies on the CPU-only PyTorch wheel index
-- [ ] Basic rate limiting on `/predict`
+- [x] Basic rate limiting on `/predict`
 
 ### v0.4 — Show the model's reasoning
 
@@ -412,7 +422,7 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 
 ### v0.6 — Deployment and reproducibility
 
-- [ ] Dockerfile and `docker-compose.yml`
+- [x] Dockerfile
 - [x] GitHub Actions running lint and tests on push
 - [x] Unit tests for preprocessing, the confidence gate, and both error paths
 - [ ] Move `cervical_model.pth` to a release asset
