@@ -1,5 +1,7 @@
 import base64
+import hashlib
 import io
+import json
 import os
 import pathlib
 
@@ -15,6 +17,7 @@ from preprocessing import CLASS_NAMES, build_eval_transform
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "cervical_model.pth"
+MODEL_METADATA_PATH = BASE_DIR / "model_metadata.json"
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -54,6 +57,41 @@ ALLOWED_ORIGINS = [
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 CORS(app, resources={r"/predict": {"origins": ALLOWED_ORIGINS}})
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_model_metadata(metadata_path=MODEL_METADATA_PATH, model_path=MODEL_PATH):
+    """Load and verify the sidecar tying the checkpoint to serving code."""
+    try:
+        metadata = json.loads(metadata_path.read_text())
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Missing model metadata: {metadata_path}") from error
+
+    expected_classes = metadata.get("class_names")
+    if expected_classes != CLASS_NAMES:
+        raise RuntimeError(
+            f"Model metadata class order {expected_classes!r} does not match serving "
+            f"class order {CLASS_NAMES!r}"
+        )
+
+    expected_sha = metadata.get("sha256")
+    actual_sha = file_sha256(model_path)
+    if expected_sha != actual_sha:
+        raise RuntimeError(
+            f"Model checkpoint checksum mismatch for {model_path.name}: "
+            f"metadata has {expected_sha}, file has {actual_sha}"
+        )
+
+    return metadata
+
+
+MODEL_METADATA = load_model_metadata()
 
 device = torch.device("cpu")
 

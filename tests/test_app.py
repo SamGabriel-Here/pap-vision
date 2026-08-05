@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 
 import pytest
 import torch
@@ -216,6 +217,41 @@ def test_the_reference_lists_classes_in_severity_order(client):
     body = client.get("/").get_data(as_text=True)
     positions = [body.index(papvision.CLASS_MEANINGS[n]) for n in papvision.SEVERITY_ORDER]
     assert positions == sorted(positions), "reference must read NILM -> SCC"
+
+
+
+# --- model metadata ---------------------------------------------------------
+
+def test_model_metadata_matches_checkpoint_and_serving_constants():
+    assert papvision.MODEL_METADATA["class_names"] == papvision.CLASS_NAMES
+    assert papvision.MODEL_METADATA["sha256"] == papvision.file_sha256(papvision.MODEL_PATH)
+    assert papvision.MODEL_METADATA["confidence_threshold"] == papvision.CONFIDENCE_THRESHOLD
+
+
+def test_model_metadata_rejects_class_order_drift(tmp_path):
+    model_file = tmp_path / "model.pth"
+    model_file.write_bytes(b"checkpoint")
+    metadata_file = tmp_path / "model_metadata.json"
+    metadata_file.write_text(json.dumps({
+        "class_names": list(reversed(papvision.CLASS_NAMES)),
+        "sha256": papvision.file_sha256(model_file),
+    }))
+
+    with pytest.raises(RuntimeError, match="class order"):
+        papvision.load_model_metadata(metadata_file, model_file)
+
+
+def test_model_metadata_rejects_checkpoint_drift(tmp_path):
+    model_file = tmp_path / "model.pth"
+    model_file.write_bytes(b"changed checkpoint")
+    metadata_file = tmp_path / "model_metadata.json"
+    metadata_file.write_text(json.dumps({
+        "class_names": papvision.CLASS_NAMES,
+        "sha256": "0" * 64,
+    }))
+
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        papvision.load_model_metadata(metadata_file, model_file)
 
 
 def test_the_scc_entry_says_it_is_broken(client):

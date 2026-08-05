@@ -1,0 +1,32 @@
+{
+  "model_file": "cervical_model.pth",
+  "sha256": "1da7a46266a95758c3a6ed11d00bd2a2c73501dba33d85bb1cbecc2f9b479882",
+  "architecture": "torchvision.models.mobilenet_v3_small",
+  "classifier": "classifier[3] -> Linear(in_features, 4)",
+  "class_names": [
+    "HSIL",
+    "LSIL",
+    "NILM",
+    "SCC"
+  ],
+  "image_size": 224,
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "confidence_threshold": 0.9,
+  "intended_use": "Research and educational use only. Not a medical device.",
+  "metric_summary": {
+    "cv_scc_recall_mean": 0.153,
+    "cv_balanced_accuracy_mean": 0.689,
+    "cv_macro_f1_mean": 0.663
+  }
+}
