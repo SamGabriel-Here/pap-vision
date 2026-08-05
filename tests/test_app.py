@@ -140,6 +140,20 @@ def test_result_page_repeats_the_disclaimer_next_to_the_prediction(client, confi
     assert body.count("Not a medical device") >= 2
 
 
+def test_low_confidence_page_still_shows_the_score_breakdown(client, unsure):
+    """The JSON API always returns per-class scores on low confidence; the
+    HTML page must not hide that same information from a browser user."""
+    response = client.post(
+        "/", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
+    )
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "Cannot determine the result with confidence" in body
+    assert "reporting threshold" in body
+    assert body.count('class="score-name"') == len(papvision.CLASS_NAMES)
+
+
 def test_predict_returns_prediction_and_probabilities(client, confident):
     response = client.post(
         "/predict", data={"file": (io.BytesIO(make_image_bytes()), "smear.png")}
@@ -149,6 +163,7 @@ def test_predict_returns_prediction_and_probabilities(client, confident):
     assert response.status_code == 200
     assert payload["prediction"] == "HSIL"
     assert set(payload["probabilities"]) == set(papvision.CLASS_NAMES)
+    assert payload["softmax_score"] == payload["confidence"]
 
 
 def test_predict_rejects_a_missing_file(client):

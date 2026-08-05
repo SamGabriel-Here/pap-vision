@@ -309,11 +309,12 @@ curl -F "file=@sample.png" http://localhost:8080/predict
 {
   "prediction": "HSIL",
   "confidence": 90.67,
+  "softmax_score": 90.67,
   "probabilities": { "HSIL": 90.67, "LSIL": 0.09, "NILM": 7.23, "SCC": 2.01 }
 }
 ```
 
-`confidence` and the values in `probabilities` are softmax scores as percentages. They are **not** probabilities that the answer is correct. The example above is a real response to a held-out **SCC** image.
+`confidence` (kept for backward compatibility), `softmax_score`, and the values in `probabilities` are softmax scores as percentages. They are **not** probabilities that the answer is correct. The example above is a real response to a held-out **SCC** image.
 
 **400** — `No file uploaded`, `No image selected`, `Unsupported file type`, `Uploaded file is empty`, `Uploaded file is not a valid image`, `Low confidence, please upload a clearer image` (with `probabilities`).
 

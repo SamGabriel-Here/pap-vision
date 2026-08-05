@@ -223,10 +223,11 @@ def index():
 
     try:
         prediction, confidence, breakdown = classify(image)
-    except LowConfidence:
+    except LowConfidence as low:
         return render_template(
             "index.html",
             error="Cannot determine the result with confidence. Please upload a clearer image.",
+            probabilities=low.probabilities,
             img_src=preview,
         ), 200
 
@@ -257,6 +258,7 @@ def predict():
     return jsonify({
         "prediction": prediction,
         "confidence": confidence,
+        "softmax_score": confidence,
         "probabilities": breakdown,
     })
 

@@ -343,6 +343,26 @@
     </figure>
   {% endif %}
 </div>
+{% elif error and probabilities %}
+<div class="card">
+  <div class="scores">
+    <div class="verdict-label" style="margin-bottom:.5rem">Softmax scores — none reached the {{ threshold_percent }}% reporting threshold</div>
+    {% for name, score in probabilities|dictsort(by='value', reverse=true) %}
+      <div class="score-row">
+        <span class="score-name">{{ name }}</span>
+        <span class="track"><span class="fill c-{{ name }}" style="width: {{ score }}%"></span></span>
+        <span class="score-val">{{ '%.2f'|format(score) }}%</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if img_src %}
+    <figure>
+      <img src="{{ img_src }}" alt="Downscaled preview of the uploaded image">
+      <figcaption>Downscaled copy, embedded in this page</figcaption>
+    </figure>
+  {% endif %}
+</div>
 {% elif img_src %}
 <div class="card">
   <figure style="margin:0">
