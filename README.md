@@ -257,6 +257,20 @@ pytest && ruff check .
 
 For a production-ish run: `gunicorn -w 2 -b 0.0.0.0:8080 app:app` — each worker loads its own copy of the model.
 
+### Running it with Docker
+
+```bash
+docker build -t papvision .
+docker run -d -p 8080:8080 --name papvision papvision
+curl http://localhost:8080/health
+```
+
+The image installs `requirements.txt` only (no training dependencies), runs
+`gunicorn` with 2 workers as an unprivileged `papvision` user, and exposes a
+Docker `HEALTHCHECK` against `/health`. Built and run locally against this
+checkpoint: `docker build` succeeds, `/health` returns `200`, and `/predict`
+returns real inference output from inside the container.
+
 ### Configuration
 
 | Variable | Default | Purpose |

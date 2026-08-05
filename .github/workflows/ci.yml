@@ -32,3 +32,22 @@ jobs:
 
       - name: Test
         run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t papvision:ci .
+      - name: Smoke test container
+        run: |
+          docker run -d --name papvision-ci -p 8080:8080 papvision:ci
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "health check passed"; break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/health
+          docker logs papvision-ci
+          docker rm -f papvision-ci

@@ -39,6 +39,7 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 - Model checkpoint/class-order integrity guard (`model_metadata.json` + startup validation in `app.py`), with tests for the success path, class-order drift, and checksum drift.
 - Low-confidence HTML results now show the same per-class softmax breakdown the JSON API already returned, instead of a bare error message.
 - `/predict` now also returns `softmax_score` alongside the existing `confidence` field (kept for backward compatibility), and the README documents both.
+- Added `Dockerfile` and `.dockerignore`: `requirements.txt`-only image, non-root `papvision` user, `gunicorn` with 2 workers, `HEALTHCHECK` against `/health`. Actually built and ran locally: `docker build` succeeded (1.36 GB image), the container started healthy, `curl /health` returned `200`, and `curl -F file=@... /predict` returned real inference JSON from inside the container. CI now has a second job that builds the image and smoke-tests `/health` on every push/PR.
 
 ## Issues and risks
 
@@ -48,7 +49,7 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 4. **There is no out-of-distribution rejection.** Non-cytology or synthetic images may still be mapped to one of the four disease classes with high softmax.
 5. **The dataset is too small at the slide level.** Rare classes have only a few slides, so per-class metrics have high fold-to-fold variance.
 6. ~~Low-confidence HTML results hide the score breakdown.~~ Fixed: the HTML page now renders the same breakdown the JSON API always returned.
-7. **Deployment hardening is partly incomplete.** CI is already present, and a model metadata/checksum sidecar now exists, but there is still no Dockerfile or production deployment example.
+7. ~~Deployment hardening was partly incomplete.~~ Fixed: `Dockerfile`, `.dockerignore`, a non-root runtime user, a container `HEALTHCHECK`, and a CI job that builds and smoke-tests the image now exist.
 8. **Full-test dependency expectations are easy to miss.** Running tests after only `requirements.txt` fails because `scikit-learn` is intentionally training-only but needed by baseline tests.
 
 ## Recommended improvements
@@ -62,8 +63,7 @@ Note: `requirements.txt` is sufficient for serving, but the full test suite impo
 
 ### Engineering (remaining)
 
-- Add Docker or a minimal deployment guide with `gunicorn`, `PAPVISION_ALLOWED_ORIGINS`, max upload size, and health check.
-- Wire model checksum re-verification into CI so a checkpoint update without a matching `model_metadata.json` update fails the build.
+- Wire model checksum re-verification into CI so a checkpoint update without a matching `model_metadata.json` update fails the build (today it would fail at container startup instead, which is safe but later than ideal).
 
 ### Research
 
